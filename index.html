@@ -261,8 +261,10 @@
             display: none;
             background: white;
             border-radius: 0 0 10px 10px;
-            box-shadow: 0 2px 10px rgba(226, 9, 9, 0.1);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             min-height: 70vh;
+            max-height: calc(100vh - 260px);
+            overflow-y: auto;
         }
 
         .tab-content.active {
@@ -392,6 +394,8 @@
         /* Import Tab Styles */
         .import-section {
             padding: 30px;
+            height: 100%;
+            overflow-y: auto;
         }
 
         .import-header {
@@ -1905,5 +1909,4 @@
         });
     </script>
 </body>
-
 </html>
