@@ -592,6 +592,54 @@
             color: #555;
         }
 
+        /* Sheet Field Configuration Styles */
+        .sheet-field-config {
+            background: #fff3cd;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border: 1px solid #ffeaa7;
+            display: none; /* Ẩn ban đầu */
+        }
+
+        .sheet-field-config h4 {
+            color: #856404;
+            margin-bottom: 15px;
+        }
+
+        .config-item {
+            margin-bottom: 15px;
+        }
+
+        .config-item label {
+            display: block;
+            font-weight: bold;
+            color: #495057;
+            margin-bottom: 8px;
+        }
+
+        .sheet-field-input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s ease;
+        }
+
+        .sheet-field-input:focus {
+            border-color: #007bff;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+        }
+
+        .config-note {
+            margin-top: 8px;
+            font-size: 13px;
+            color: #6c757d;
+            font-style: italic;
+        }
+
         /* Sheet Selector Styles */
         .sheet-selector {
             margin: 20px 0;
@@ -895,6 +943,18 @@
                     </div>
                 </div>
 
+                <!-- Sheet Field Name Configuration -->
+                <div class="sheet-field-config">
+                    <h4>🏷️ Cấu hình tên trường từ Sheet:</h4>
+                    <div class="config-item">
+                        <label for="sheetFieldName">Tên trường lấy từ tên Sheet (chỉ áp dụng khi file có nhiều sheet):</label>
+                        <input type="text" id="sheetFieldName" class="sheet-field-input" 
+                               value="Đơn vị quản lý học phần" 
+                               placeholder="Nhập tên trường mong muốn...">
+                        <p class="config-note">💡 Khi file Excel có nhiều sheet, giá trị tên sheet sẽ được lưu vào trường này</p>
+                    </div>
+                </div>
+
                 <!-- Format Info -->
                 <div class="format-info">
                     <h4>📋 Định dạng file Excel:</h4>
@@ -960,6 +1020,226 @@
         let selectedSheetNames = []; // Store multiple selected sheet names
         let isLoggedIn = false; // Authentication state
         const ADMIN_PASSWORD = "admin123"; // Change this to your desired password
+        let detectedSheetFieldName = null; // Trường được phát hiện tự động chứa thông tin sheet
+        let detectedCreditFieldName = null; // Trường được phát hiện tự động chứa thông tin số tín chỉ
+
+        // Helper function to ensure field detection is done
+        function ensureFieldDetection() {
+            if (!detectedCreditFieldName) {
+                detectCreditFieldName();
+            }
+            if (!detectedSheetFieldName) {
+                detectSheetFieldName();
+            }
+        }
+
+        // Function to auto-detect credit field name
+        function detectCreditFieldName() {
+            if (!dictionaryData || dictionaryData.length === 0) {
+                detectedCreditFieldName = null;
+                return null;
+            }
+
+            const firstItem = dictionaryData[0];
+            const allFields = Object.keys(firstItem).filter(key => key !== 'id');
+            
+            // Tìm field có tên gợi ý về tín chỉ
+            const possibleNames = [
+                'Số TC', 'Số tín chỉ', 'Tín chỉ', 'TC', 'Credit', 'Credits', 'ECTS'
+            ];
+            
+            for (let fieldName of allFields) {
+                if (possibleNames.some(name => fieldName.toLowerCase().includes(name.toLowerCase()))) {
+                    detectedCreditFieldName = fieldName;
+                    console.log('Detected credit field by name:', fieldName);
+                    return fieldName;
+                }
+            }
+            
+            // Nếu không tìm thấy dựa trên tên, tìm field có giá trị số nhỏ (thường là 1-6 tín chỉ)
+            for (let fieldName of allFields) {
+                const fieldValues = dictionaryData.map(item => item[fieldName]).filter(val => val != null);
+                const uniqueValues = [...new Set(fieldValues)];
+                
+                // Kiểm tra xem field này có phải chứa số tín chỉ không
+                const allNumbers = uniqueValues.every(val => {
+                    const num = Number(val);
+                    return !isNaN(num) && num > 0 && num <= 10; // Tín chỉ thường từ 1-10
+                });
+                
+                if (allNumbers && uniqueValues.length <= 8) { // Không quá nhiều unique values
+                    detectedCreditFieldName = fieldName;
+                    console.log('Detected credit field by pattern:', fieldName, 'with values:', uniqueValues);
+                    return fieldName;
+                }
+            }
+            
+            detectedCreditFieldName = null;
+            console.log('No credit field detected');
+            return null;
+        }
+
+        // Function to auto-detect sheet field name
+        function detectSheetFieldName() {
+            if (!dictionaryData || dictionaryData.length === 0) {
+                detectedSheetFieldName = null;
+                return null;
+            }
+
+            // Lấy item đầu tiên để phân tích
+            const firstItem = dictionaryData[0];
+            const allFields = Object.keys(firstItem).filter(key => key !== 'id');
+            
+            // Tìm field có tên gợi ý về đơn vị/khoa/sheet
+            const possibleNames = [
+                'Đơn vị quản lý học phần', 'Quản lý', 'Khoa', 'Phòng ban', 'Bộ môn', 'Đơn vị', 
+                'Department', 'Faculty', 'Unit', 'Division', 'Sheet', 'Thằng chó con ngựa'
+            ];
+            
+            for (let fieldName of allFields) {
+                // Kiểm tra xem có phải field chứa thông tin đơn vị không
+                if (possibleNames.some(name => fieldName.toLowerCase().includes(name.toLowerCase()))) {
+                    detectedSheetFieldName = fieldName;
+                    console.log('Detected sheet field by name:', fieldName);
+                    return fieldName;
+                }
+            }
+            
+            // Nếu không tìm thấy dựa trên tên, thử tìm field có values giống tên sheet
+            // (để dự phòng cho trường hợp tên field được đặt tùy chỉnh)
+            // Detect credit field để exclude nó khỏi sheet field detection
+            const creditField = detectCreditFieldName();
+            
+            for (let fieldName of allFields) {
+                // Skip credit field và các field có patterns không phải sheet field
+                if (fieldName === creditField) continue;
+                
+                // Skip fields có patterns của ID, code, tên course
+                if (fieldName.toLowerCase().includes('stt') || 
+                    fieldName.toLowerCase().includes('mã') ||
+                    fieldName.toLowerCase().includes('tên') ||
+                    fieldName.toLowerCase().includes('name') ||
+                    fieldName.toLowerCase().includes('title') ||
+                    fieldName.toLowerCase().includes('code')) {
+                    continue;
+                }
+                
+                const fieldValues = dictionaryData.map(item => item[fieldName]).filter(val => val);
+                const uniqueValues = [...new Set(fieldValues)];
+                
+                // Nếu field này có ít unique values và tất cả values đều là string ngắn
+                // thì có thể đây là field chứa thông tin sheet/đơn vị
+                if (uniqueValues.length <= 10 && uniqueValues.length > 0) {
+                    const allShortStrings = uniqueValues.every(val => 
+                        typeof val === 'string' && val.length < 100 && val.length > 0
+                    );
+                    if (allShortStrings) {
+                        detectedSheetFieldName = fieldName;
+                        console.log('Detected sheet field by pattern:', fieldName, 'with values:', uniqueValues);
+                        return fieldName;
+                    }
+                }
+            }
+            
+            detectedSheetFieldName = null;
+            return null;
+        }
+
+
+
+        // Function to display filtered results
+        function displayFilteredResults(results, fieldName, fieldValue) {
+            ensureFieldDetection();
+            const resultsContainer = document.getElementById('resultsContainer');
+            
+            if (results.length === 0) {
+                resultsContainer.innerHTML = `
+                    <div class="no-results">
+                        <h3>😔 Không tìm thấy kết quả</h3>
+                        <p>Không có học phần nào có <strong>${fieldName}</strong> là "<strong>${fieldValue}</strong>"</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const totalItems = results.length;
+            let filteredHTML = `
+                <div style="background: linear-gradient(135deg, #007bff 0%, #0056b3 100%); padding: 20px; border-radius: 12px; margin-bottom: 20px; text-align: center; color: white;">
+                    <h3 style="margin: 0 0 8px 0; font-size: 18px;">🔍 ${fieldName}: ${fieldValue}</h3>
+                    <p style="margin: 0; font-size: 14px; opacity: 0.9;">Tổng cộng: <strong>${totalItems}</strong> học phần</p>
+                </div>
+            `;
+
+            // Hiển thị từng item
+            filteredHTML += results.map(item => {
+                const fields = Object.keys(dataStructure);
+                let resultHTML = '<div class="result-item">';
+                
+                // Hiển thị trường đầu tiên làm title
+                const primaryField = fields[0];
+                const primaryValue = item[primaryField];
+                const secondaryField = fields[1];
+                const secondaryValue = item[secondaryField];
+                
+                resultHTML += `<div class="result-title" style="font-size: 16px; font-weight: bold; margin-bottom: 10px;">${String(primaryValue)}`;
+                if (secondaryValue && secondaryField !== primaryField) {
+                    resultHTML += ` <span style="font-size: 14px; color: #666; font-weight: normal;">- ${secondaryValue}</span>`;
+                }
+                resultHTML += `</div>`;
+                
+                // Section cho các badges quan trọng
+                resultHTML += `<div style="margin: 10px 0; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">`;
+                
+                // Badge trường được filter (hiển thị với màu xanh da trời)
+                if (item[fieldName]) {
+                    resultHTML += `<span style="background: #007bff; color: white; padding: 4px 10px; border-radius: 15px; font-size: 12px; font-weight: 600; display: inline-block;">🔍 ${fieldName}: ${item[fieldName]}</span>`;
+                }
+                
+                // Badge Credit (nếu có và khác với trường đang filter)
+                const creditField = detectCreditFieldName();
+                if (creditField && item[creditField] && fieldName !== creditField) {
+                    resultHTML += `<span onclick="searchByField('${creditField}', '${item[creditField]}')" style="background: #ff9800; color: white; padding: 4px 10px; border-radius: 15px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.3s; display: inline-block;" onmouseover="this.style.background='#f57f17'; this.style.transform='scale(1.05)'" onmouseout="this.style.background='#ff9800'; this.style.transform='scale(1)'" title="Click để lọc theo ${creditField}: ${item[creditField]}">📊 ${item[creditField]} TC</span>`;
+                }
+                
+                // Badge Đơn vị quản lý (nếu có và khác với trường đang filter)
+                if (detectedSheetFieldName && item[detectedSheetFieldName] && fieldName !== detectedSheetFieldName) {
+                    resultHTML += `<span onclick="searchByDepartment('${item[detectedSheetFieldName]}')" style="background: #28a745; color: white; padding: 4px 10px; border-radius: 15px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.3s; display: inline-block;" onmouseover="this.style.background='#20c997'; this.style.transform='scale(1.05)'" onmouseout="this.style.background='#28a745'; this.style.transform='scale(1)'" title="Click để xem tất cả học phần của đơn vị này">📁 ${item[detectedSheetFieldName]}</span>`;
+                }
+                
+                resultHTML += `</div>`;
+                
+                // Hiển thị các trường khác (trừ primary, secondary, filtered field, sheet field và Số TC)
+                fields.slice(2).forEach(fieldDisplayName => {
+                    if (fieldDisplayName === detectedSheetFieldName || fieldDisplayName === fieldName || fieldDisplayName === detectedCreditFieldName) return; // Skip vì đã hiển thị ở trên
+                    
+                    const value = item[fieldDisplayName];
+                    const fieldDisplay = dataStructure[fieldDisplayName].displayName;
+                    
+                    if (value) {
+                        if (Array.isArray(value)) {
+                            // Hiển thị array (tags) - chỉ hiển thị, không có link
+                            resultHTML += `<div style="margin-top: 12px;">`;
+                            resultHTML += `<span style="font-size: 13px; color: #666; font-weight: 600;">${fieldDisplay}: </span>`;
+                            resultHTML += value.map(tag => 
+                                `<span style="background: #e3f2fd; padding: 3px 8px; border-radius: 12px; font-size: 12px; margin-right: 6px; color: #1976d2; display: inline-block; margin-top: 2px;">${tag}</span>`
+                            ).join('');
+                            resultHTML += `</div>`;
+                        } else {
+                            // Hiển thị text thường - chỉ hiển thị, không có link
+                            resultHTML += `<div style="margin-top: 10px; font-size: 14px; line-height: 1.4;">`;
+                            resultHTML += `<span style="color: #666; font-weight: 600;">${fieldDisplay}:</span> `;
+                            resultHTML += `<span style="color: #333;">${String(value)}</span>`;
+                            resultHTML += `</div>`;
+                        }
+                    }
+                });
+
+                resultHTML += '</div>';
+                return resultHTML;
+            }).join('');
+
+            resultsContainer.innerHTML = filteredHTML;
+        }
 
         // Authentication functions
         function openLoginModal() {
@@ -1138,6 +1418,12 @@
                 dataStructure = analyzeDataStructure(dictionaryData);
                 console.log('Data structure detected:', dataStructure);
                 
+                // Tự động phát hiện các trường quan trọng
+                const detectedSheetField = detectSheetFieldName();
+                const detectedCreditField = detectCreditFieldName();
+                console.log('Sheet field detected:', detectedSheetField);
+                console.log('Credit field detected:', detectedCreditField);
+                
                 // Hiển thị toàn bộ dữ liệu khi vừa load xong
                 displayAllData();
                 
@@ -1245,8 +1531,8 @@
                 const maHP = item['Mã HP'] || '';
                 const tenViet = item['Tên tiếng Việt'] || '';
                 const tenAnh = item['Tên tiếng Anh'] || '';
-                const donVi = item['Đơn vị quản lý học phần'] || '';
-                const soTC = item['Số TC'] || '';
+                const donVi = detectedSheetFieldName ? (item[detectedSheetFieldName] || '') : '';
+                const creditValue = detectedCreditFieldName ? (item[detectedCreditFieldName] || '') : '';
                 
                 // Xác định trường nào khớp với search term để highlight
                 let primaryText = '';
@@ -1272,7 +1558,7 @@
                             <div style="flex: 1;">
                                 <span class="suggestion-word">${highlightText(String(primaryText), searchTerm)}</span>
                                 <span class="suggestion-category">${maHP}</span>
-                                ${soTC ? `<span style="background: #ff9800; color: white; padding: 2px 6px; border-radius: 10px; font-size: 10px; margin-left: 5px;">${soTC} TC</span>` : ''}
+                                ${creditValue ? `<span onclick="event.stopPropagation(); searchByField('${detectedCreditFieldName}', '${creditValue}')" style="background: #ff9800; color: white; padding: 2px 6px; border-radius: 10px; font-size: 10px; margin-left: 5px; cursor: pointer; transition: all 0.3s;" onmouseover="this.style.background='#f57f17'" onmouseout="this.style.background='#ff9800'" title="Click để lọc theo ${detectedCreditFieldName}: ${creditValue}">${creditValue} TC</span>` : ''}
                             </div>
                         </div>
                         <div class="suggestion-description">
@@ -1330,38 +1616,49 @@
                     const secondaryField = fields[1];
                     const secondaryValue = item[secondaryField];
                     
-                    resultHTML += `<div class="result-title">${highlightText(String(primaryValue), term)}`;
+                    resultHTML += `<div class="result-title" style="font-size: 16px; font-weight: bold; margin-bottom: 10px;">${highlightText(String(primaryValue), term)}`;
                     if (secondaryValue && secondaryField !== primaryField) {
-                        resultHTML += ` <span style="font-size: 12px; color: #666; font-weight: normal;">- ${secondaryValue}</span>`;
+                        resultHTML += ` <span style="font-size: 14px; color: #666; font-weight: normal;">- ${secondaryValue}</span>`;
                     }
                     resultHTML += `</div>`;
                     
-                    // Hiển thị trường "Đơn vị quản lý học phần" với styling đặc biệt và chức năng click
-                    if (item["Đơn vị quản lý học phần"]) {
-                        resultHTML += `<div style="margin-top: 8px;">`;
-                        resultHTML += `<span class="department-clickable" onclick="searchByDepartment('${item["Đơn vị quản lý học phần"]}')" style="background: #28a745; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.3s;" onmouseover="this.style.background='#20c997'; this.style.transform='scale(1.05)'" onmouseout="this.style.background='#28a745'; this.style.transform='scale(1)'" title="Click để xem tất cả học phần của đơn vị này">📁 Đơn vị quản lý học phần: ${item["Đơn vị quản lý học phần"]}</span>`;
-                        resultHTML += `</div>`;
+                    // Section cho các badges quan trọng (có thể click)
+                    resultHTML += `<div style="margin: 10px 0; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">`;
+                    
+                    // Badge Credit (nếu có)
+                    if (detectedCreditFieldName && item[detectedCreditFieldName]) {
+                        resultHTML += `<span onclick="searchByField('${detectedCreditFieldName}', '${item[detectedCreditFieldName]}')" style="background: #ff9800; color: white; padding: 4px 10px; border-radius: 15px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.3s; display: inline-block;" onmouseover="this.style.background='#f57f17'; this.style.transform='scale(1.05)'" onmouseout="this.style.background='#ff9800'; this.style.transform='scale(1)'" title="Click để lọc theo ${detectedCreditFieldName}: ${item[detectedCreditFieldName]}">📊 ${item[detectedCreditFieldName]} TC</span>`;
                     }
                     
-                    // Hiển thị các trường khác (trừ primary, secondary và "Đơn vị quản lý học phần")
+                    // Badge Đơn vị quản lý (nếu có)
+                    if (detectedSheetFieldName && item[detectedSheetFieldName]) {
+                        resultHTML += `<span onclick="searchByDepartment('${item[detectedSheetFieldName]}')" style="background: #28a745; color: white; padding: 4px 10px; border-radius: 15px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.3s; display: inline-block;" onmouseover="this.style.background='#20c997'; this.style.transform='scale(1.05)'" onmouseout="this.style.background='#28a745'; this.style.transform='scale(1)'" title="Click để xem tất cả học phần của đơn vị này">📁 ${item[detectedSheetFieldName]}</span>`;
+                    }
+                    
+                    resultHTML += `</div>`;
+                    
+                    // Hiển thị các trường khác (trừ primary, secondary, sheet field và Số TC)
                     fields.slice(2).forEach(fieldName => {
-                        if (fieldName === "Đơn vị quản lý học phần") return; // Skip vì đã hiển thị ở trên
+                        if (fieldName === detectedSheetFieldName || fieldName === detectedCreditFieldName) return; // Skip vì đã hiển thị ở trên
                         
                         const value = item[fieldName];
                         const fieldDisplay = dataStructure[fieldName].displayName;
                         
                         if (value) {
                             if (Array.isArray(value)) {
-                                // Hiển thị array (tags)
-                                resultHTML += `<div style="margin-top: 8px;">`;
-                                resultHTML += `<span style="font-size: 11px; color: #888;">${fieldDisplay}: </span>`;
+                                // Hiển thị array (tags) - chỉ hiển thị, không có link
+                                resultHTML += `<div style="margin-top: 12px;">`;
+                                resultHTML += `<span style="font-size: 13px; color: #666; font-weight: 600;">${fieldDisplay}: </span>`;
                                 resultHTML += value.map(tag => 
-                                    `<span style="background: #e3f2fd; padding: 2px 6px; border-radius: 10px; font-size: 10px; margin-right: 4px; color: #1976d2;">${highlightText(String(tag), term)}</span>`
+                                    `<span style="background: #e3f2fd; padding: 3px 8px; border-radius: 12px; font-size: 12px; margin-right: 6px; color: #1976d2; display: inline-block; margin-top: 2px;">${highlightText(String(tag), term)}</span>`
                                 ).join('');
                                 resultHTML += `</div>`;
                             } else {
-                                // Hiển thị text thường
-                                resultHTML += `<div class="result-description"><strong>${fieldDisplay}:</strong> ${highlightText(String(value), term)}</div>`;
+                                // Hiển thị text thường - chỉ hiển thị, không có link
+                                resultHTML += `<div style="margin-top: 10px; font-size: 14px; line-height: 1.4;">`;
+                                resultHTML += `<span style="color: #666; font-weight: 600;">${fieldDisplay}:</span> `;
+                                resultHTML += `<span style="color: #333;">${highlightText(String(value), term)}</span>`;
+                                resultHTML += `</div>`;
                             }
                         }
                     });
@@ -1378,89 +1675,41 @@
         // Debounced search function - giảm delay để phản hồi nhanh hơn
         const debouncedSearch = debounce(showSuggestions, 150);
 
-        // Hàm tìm kiếm theo đơn vị quản lý học phần
-        function searchByDepartment(departmentName) {
+        // Hàm tìm kiếm theo bất kỳ trường nào
+        function searchByField(fieldName, fieldValue) {
             const results = dictionaryData.filter(item => {
-                const itemDepartment = item['Đơn vị quản lý học phần'] || '';
-                return itemDepartment === departmentName;
+                const itemValue = item[fieldName];
+                return itemValue && String(itemValue).trim() === fieldValue;
             });
 
             const resultsContainer = document.getElementById('resultsContainer');
             const searchInput = document.getElementById('searchInput');
             
             // Cập nhật search input
-            searchInput.value = `Đơn vị: ${departmentName}`;
+            searchInput.value = `${fieldName}: ${fieldValue}`;
             
             // Ẩn dropdown suggestions
             document.getElementById('suggestionsDropdown').style.display = 'none';
 
             if (results.length === 0) {
-                resultsContainer.innerHTML = '<div class="no-results">Không tìm thấy học phần nào của đơn vị này</div>';
+                resultsContainer.innerHTML = `
+                    <div class="no-results">
+                        <h3>😔 Không tìm thấy kết quả</h3>
+                        <p>Không có học phần nào có <strong>${fieldName}</strong> là "<strong>${fieldValue}</strong>"</p>
+                    </div>
+                `;
                 return;
             }
 
-            const totalItems = results.length;
-            
-            // Hiển thị header thông tin về đơn vị
-            let departmentHTML = `
-                <div style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); padding: 20px; border-radius: 12px; margin-bottom: 20px; text-align: center; color: white;">
-                    <h3 style="margin: 0 0 8px 0; font-size: 18px;">📁 ${departmentName}</h3>
-                    <p style="margin: 0; font-size: 14px; opacity: 0.9;">Tổng cộng: <strong>${totalItems}</strong> học phần</p>
-                </div>
-            `;
+            // Hiển thị kết quả giống như displayFilteredResults
+            displayFilteredResults(results, fieldName, fieldValue);
+        }
 
-            // Hiển thị từng học phần
-            departmentHTML += results.map(item => {
-                const fields = Object.keys(dataStructure);
-                let resultHTML = '<div class="result-item">';
-                
-                // Hiển thị trường đầu tiên làm title
-                const primaryField = fields[0];
-                const primaryValue = item[primaryField];
-                const secondaryField = fields[1];
-                const secondaryValue = item[secondaryField];
-                
-                resultHTML += `<div class="result-title">${String(primaryValue)}`;
-                if (secondaryValue && secondaryField !== primaryField) {
-                    resultHTML += ` <span style="font-size: 12px; color: #666; font-weight: normal;">- ${secondaryValue}</span>`;
-                }
-                resultHTML += `</div>`;
-                
-                // Hiển thị trường "Đơn vị quản lý học phần" với styling đặc biệt và chức năng click
-                if (item["Đơn vị quản lý học phần"]) {
-                    resultHTML += `<div style="margin-top: 8px;">`;
-                    resultHTML += `<span class="department-clickable" onclick="searchByDepartment('${item["Đơn vị quản lý học phần"]}')" style="background: #28a745; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.3s;" onmouseover="this.style.background='#20c997'" onmouseout="this.style.background='#28a745'">📁 Đơn vị quản lý học phần: ${item["Đơn vị quản lý học phần"]}</span>`;
-                    resultHTML += `</div>`;
-                }
-                
-                // Hiển thị các trường khác (trừ primary, secondary và "Đơn vị quản lý học phần")
-                fields.slice(2).forEach(fieldName => {
-                    if (fieldName === "Đơn vị quản lý học phần") return; // Skip vì đã hiển thị ở trên
-                    
-                    const value = item[fieldName];
-                    const fieldDisplay = dataStructure[fieldName].displayName;
-                    
-                    if (value) {
-                        if (Array.isArray(value)) {
-                            // Hiển thị array (tags)
-                            resultHTML += `<div style="margin-top: 8px;">`;
-                            resultHTML += `<span style="font-size: 11px; color: #888;">${fieldDisplay}: </span>`;
-                            resultHTML += value.map(tag => 
-                                `<span style="background: #e3f2fd; padding: 2px 6px; border-radius: 10px; font-size: 10px; margin-right: 4px; color: #1976d2;">${String(tag)}</span>`
-                            ).join('');
-                            resultHTML += `</div>`;
-                        } else {
-                            // Hiển thị text thường
-                            resultHTML += `<div class="result-description"><strong>${fieldDisplay}:</strong> ${String(value)}</div>`;
-                        }
-                    }
-                });
-                
-                resultHTML += '</div>';
-                return resultHTML;
-            }).join('');
-
-            resultsContainer.innerHTML = departmentHTML;
+        // Hàm tìm kiếm theo đơn vị quản lý học phần (backward compatibility)
+        function searchByDepartment(departmentName) {
+            if (detectedSheetFieldName) {
+                searchByField(detectedSheetFieldName, departmentName);
+            }
         }
 
         // Event listeners
@@ -1550,6 +1799,7 @@
 
         // Hiển thị toàn bộ dữ liệu
         function displayAllData() {
+            ensureFieldDetection();
             const resultsContainer = document.getElementById('resultsContainer');
             
             if (!dictionaryData || dictionaryData.length === 0) {
@@ -1578,38 +1828,49 @@
                 const secondaryField = fields[1];
                 const secondaryValue = item[secondaryField];
                 
-                resultHTML += `<div class="result-title">${String(primaryValue)}`;
+                resultHTML += `<div class="result-title" style="font-size: 16px; font-weight: bold; margin-bottom: 10px;">${String(primaryValue)}`;
                 if (secondaryValue && secondaryField !== primaryField) {
-                    resultHTML += ` <span style="font-size: 12px; color: #666; font-weight: normal;">- ${secondaryValue}</span>`;
+                    resultHTML += ` <span style="font-size: 14px; color: #666; font-weight: normal;">- ${secondaryValue}</span>`;
                 }
                 resultHTML += `</div>`;
                 
-                // Hiển thị trường "Đơn vị quản lý học phần" với styling đặc biệt và chức năng click
-                if (item["Đơn vị quản lý học phần"]) {
-                    resultHTML += `<div style="margin-top: 8px;">`;
-                    resultHTML += `<span class="department-clickable" onclick="searchByDepartment('${item["Đơn vị quản lý học phần"]}')" style="background: #28a745; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.3s;" onmouseover="this.style.background='#20c997'; this.style.transform='scale(1.05)'" onmouseout="this.style.background='#28a745'; this.style.transform='scale(1)'" title="Click để xem tất cả học phần của đơn vị này">📁 Đơn vị quản lý học phần: ${item["Đơn vị quản lý học phần"]}</span>`;
-                    resultHTML += `</div>`;
+                // Section cho các badges quan trọng (có thể click)
+                resultHTML += `<div style="margin: 10px 0; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">`;
+                
+                // Badge Credit (nếu có)
+                if (detectedCreditFieldName && item[detectedCreditFieldName]) {
+                    resultHTML += `<span onclick="searchByField('${detectedCreditFieldName}', '${item[detectedCreditFieldName]}')" style="background: #ff9800; color: white; padding: 4px 10px; border-radius: 15px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.3s; display: inline-block;" onmouseover="this.style.background='#f57f17'; this.style.transform='scale(1.05)'" onmouseout="this.style.background='#ff9800'; this.style.transform='scale(1)'" title="Click để lọc theo ${detectedCreditFieldName}: ${item[detectedCreditFieldName]}">📊 ${item[detectedCreditFieldName]} TC</span>`;
                 }
                 
-                // Hiển thị các trường khác (trừ primary, secondary và "Đơn vị quản lý học phần")
+                // Badge Đơn vị quản lý (nếu có)
+                if (detectedSheetFieldName && item[detectedSheetFieldName]) {
+                    resultHTML += `<span onclick="searchByDepartment('${item[detectedSheetFieldName]}')" style="background: #28a745; color: white; padding: 4px 10px; border-radius: 15px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.3s; display: inline-block;" onmouseover="this.style.background='#20c997'; this.style.transform='scale(1.05)'" onmouseout="this.style.background='#28a745'; this.style.transform='scale(1)'" title="Click để xem tất cả học phần của đơn vị này">📁 ${item[detectedSheetFieldName]}</span>`;
+                }
+                
+                resultHTML += `</div>`;
+                
+                // Hiển thị các trường khác (trừ primary, secondary, sheet field và Số TC)
                 fields.slice(2).forEach(fieldName => {
-                    if (fieldName === "Đơn vị quản lý học phần") return; // Skip vì đã hiển thị ở trên
+                    if (fieldName === detectedSheetFieldName || fieldName === detectedCreditFieldName) return; // Skip vì đã hiển thị ở trên
                     
                     const value = item[fieldName];
                     const fieldDisplay = dataStructure[fieldName].displayName;
                     
                     if (value) {
                         if (Array.isArray(value)) {
-                            // Hiển thị array (tags)
-                            resultHTML += `<div style="margin-top: 8px;">`;
-                            resultHTML += `<span style="font-size: 11px; color: #888;">${fieldDisplay}: </span>`;
+                            // Hiển thị array (tags) - chỉ hiển thị, không có link
+                            resultHTML += `<div style="margin-top: 12px;">`;
+                            resultHTML += `<span style="font-size: 13px; color: #666; font-weight: 600;">${fieldDisplay}: </span>`;
                             resultHTML += value.map(tag => 
-                                `<span style="background: #e3f2fd; padding: 2px 6px; border-radius: 10px; font-size: 10px; margin-right: 4px; color: #1976d2;">${String(tag)}</span>`
+                                `<span style="background: #e3f2fd; padding: 3px 8px; border-radius: 12px; font-size: 12px; margin-right: 6px; color: #1976d2; display: inline-block; margin-top: 2px;">${String(tag)}</span>`
                             ).join('');
                             resultHTML += `</div>`;
                         } else {
-                            // Hiển thị text thường
-                            resultHTML += `<div class="result-description"><strong>${fieldDisplay}:</strong> ${String(value)}</div>`;
+                            // Hiển thị text thường - chỉ hiển thị, không có link
+                            resultHTML += `<div style="margin-top: 10px; font-size: 14px; line-height: 1.4;">`;
+                            resultHTML += `<span style="color: #666; font-weight: 600;">${fieldDisplay}:</span> `;
+                            resultHTML += `<span style="color: #333;">${String(value)}</span>`;
+                            resultHTML += `</div>`;
                         }
                     }
                 });
@@ -1635,6 +1896,11 @@
                 return;
             }
 
+            // Reset UI state
+            document.getElementById('sheetSelector').style.display = 'none';
+            document.getElementById('previewSection').style.display = 'none';
+            updateFieldConfigVisibility(false);
+
             showStatus('Đang đọc file Excel...', 'success');
 
             const reader = new FileReader();
@@ -1650,10 +1916,12 @@
 
                     if (excelWorkbook.SheetNames.length === 1) {
                         // Chỉ có 1 sheet, xử lý trực tiếp
+                        updateFieldConfigVisibility(false);
                         selectedSheetNames = [excelWorkbook.SheetNames[0]];
                         processSelectedSheets();
                     } else {
                         // Có nhiều sheet, hiển thị để chọn
+                        updateFieldConfigVisibility(true);
                         displaySheetSelector();
                     }
 
@@ -1664,6 +1932,21 @@
             };
 
             reader.readAsArrayBuffer(file);
+        }
+
+        function updateFieldConfigVisibility(isMultipleSheets) {
+            const configSection = document.querySelector('.sheet-field-config');
+            const configNote = document.querySelector('.config-note');
+            
+            if (isMultipleSheets) {
+                configSection.style.display = 'block';
+                configNote.innerHTML = '💡 File Excel có nhiều sheet - tên sheet sẽ được lưu vào trường này';
+                configNote.style.color = '#28a745';
+            } else {
+                configSection.style.display = 'block';
+                configNote.innerHTML = '💡 File Excel chỉ có 1 sheet - trường này sẽ không được thêm vào dữ liệu';
+                configNote.style.color = '#6c757d';
+            }
         }
 
         function displaySheetSelector() {
@@ -1765,6 +2048,9 @@
             let totalValidRows = 0;
             let totalInvalidRows = 0;
             let globalId = 1;
+            
+            // Kiểm tra xem có phải chỉ 1 sheet không
+            const isMultipleSheets = excelWorkbook.SheetNames.length > 1;
 
             selectedSheetNames.forEach(sheetName => {
                 const sheet = excelWorkbook.Sheets[sheetName];
@@ -1775,8 +2061,9 @@
                     return;
                 }
 
-                // Process each sheet's data
-                const { validRows, invalidRows, sheetData } = processSheetData(jsonData, sheetName, globalId);
+                // Process each sheet's data - chỉ truyền sheetName khi có nhiều sheet
+                const customFieldName = document.getElementById('sheetFieldName').value.trim() || 'Đơn vị quản lý học phần';
+                const { validRows, invalidRows, sheetData } = processSheetData(jsonData, isMultipleSheets ? sheetName : null, globalId, customFieldName);
                 
                 // Merge into pending data
                 pendingImportData = pendingImportData.concat(sheetData);
@@ -1794,11 +2081,15 @@
             // Hide sheet selector
             document.getElementById('sheetSelector').style.display = 'none';
 
-            showStatus(`Đã gộp ${selectedSheetNames.length} sheet: ${totalValidRows} dòng hợp lệ, ${totalInvalidRows} dòng bỏ qua`, 'success');
+            if (isMultipleSheets) {
+                showStatus(`Đã gộp ${selectedSheetNames.length} sheet: ${totalValidRows} dòng hợp lệ, ${totalInvalidRows} dòng bỏ qua`, 'success');
+            } else {
+                showStatus(`Đã xử lý: ${totalValidRows} dòng hợp lệ, ${totalInvalidRows} dòng bỏ qua`, 'success');
+            }
             displayPreview();
         }
 
-        function processSheetData(rawData, sheetName, startId) {
+        function processSheetData(rawData, sheetName, startId, customFieldName) {
             // Get header row (row 0) - tên các cột từ Excel
             const headerRow = rawData[0];
             const dataRows = rawData.slice(1);
@@ -1820,9 +2111,13 @@
 
                 // Tạo object với tên field = tên header từ Excel
                 const rowData = {
-                    id: startId + validRows,
-                    "Đơn vị quản lý học phần": sheetName
+                    id: startId + validRows
                 };
+                
+                // Chỉ thêm trường tùy chỉnh khi có nhiều sheet
+                if (sheetName && customFieldName) {
+                    rowData[customFieldName] = sheetName;
+                }
 
                 let hasValidData = false;
                 headerRow.forEach((header, colIndex) => {
@@ -1854,68 +2149,7 @@
             return { validRows, invalidRows, sheetData };
         }
 
-        function processExcelData(rawData) {
-            // Get header row (row 0) - tên các cột từ Excel
-            const headerRow = rawData[0];
-            const dataRows = rawData.slice(1);
-            pendingImportData = [];
 
-            if (!headerRow || headerRow.length === 0) {
-                showStatus('File Excel phải có header row!', 'error');
-                return;
-            }
-
-            let validRows = 0;
-            let invalidRows = 0;
-
-            dataRows.forEach((row, index) => {
-                // Skip empty rows
-                if (!row || row.length === 0 || row.every(cell => !cell)) {
-                    invalidRows++;
-                    return;
-                }
-
-                // Tạo object với tên field = tên header từ Excel
-                const rowData = {
-                    id: Date.now() + index, // Temporary ID
-                    "Đơn vị quản lý học phần": selectedSheetName || "Sheet1" // Thêm tên sheet
-                };
-
-                let hasValidData = false;
-                headerRow.forEach((header, colIndex) => {
-                    if (header && header.trim()) {
-                        const fieldName = String(header).trim();
-                        const cellValue = row[colIndex] ? String(row[colIndex]).trim() : '';
-                        
-                        // Xử lý đặc biệt cho field có thể là array (tags, keywords, etc.)
-                        if (fieldName.toLowerCase().includes('tag') || 
-                            fieldName.toLowerCase().includes('keyword') ||
-                            fieldName.toLowerCase().includes('từ khóa')) {
-                            rowData[fieldName] = cellValue ? cellValue.split(',').map(tag => tag.trim()) : [];
-                        } else {
-                            rowData[fieldName] = cellValue;
-                        }
-                        
-                        if (cellValue) hasValidData = true;
-                    }
-                });
-
-                if (hasValidData) {
-                    pendingImportData.push(rowData);
-                    validRows++;
-                } else {
-                    invalidRows++;
-                }
-            });
-
-            if (pendingImportData.length === 0) {
-                showStatus('Không có dữ liệu hợp lệ trong file Excel!', 'error');
-                return;
-            }
-
-            showStatus(`Đã xử lý: ${validRows} dòng hợp lệ, ${invalidRows} dòng bỏ qua`, 'success');
-            displayPreview();
-        }
 
         function displayPreview() {
             const previewSection = document.getElementById('previewSection');
