@@ -393,6 +393,30 @@
             margin-top: 3px;
         }
 
+        /* Styles for clickable department elements */
+        .department-clickable {
+            position: relative;
+        }
+
+        .department-clickable::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 12px;
+            padding: 1px;
+            background: linear-gradient(45deg, transparent, rgba(255,255,255,0.3));
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: exclude;
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask-composite: exclude;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .department-clickable:hover::after {
+            opacity: 1;
+        }
+
         .highlight {
             background-color: #ffeb3b;
             font-weight: bold;
@@ -1254,7 +1278,7 @@
                         <div class="suggestion-description">
                             ${matchedField !== 'Tên tiếng Việt' && tenViet ? `<div style="font-size: 11px; color: #555; margin-top: 2px;">${highlightText(tenViet, searchTerm)}</div>` : ''}
                             ${matchedField !== 'Tên tiếng Anh' && tenAnh ? `<div style="font-size: 10px; color: #777; font-style: italic; margin-top: 1px;">${highlightText(tenAnh, searchTerm)}</div>` : ''}
-                            ${donVi ? `<div style="font-size: 9px; color: #999; margin-top: 2px;">📁 ${donVi}</div>` : ''}
+                            ${donVi ? `<div style="font-size: 9px; color: #999; margin-top: 2px; cursor: pointer;" onclick="event.stopPropagation(); searchByDepartment('${donVi}')" onmouseover="this.style.color='#007bff'" onmouseout="this.style.color='#999'" title="Click để xem tất cả học phần của đơn vị này">📁 ${donVi}</div>` : ''}
                         </div>
                     </div>
                 `;
@@ -1312,10 +1336,10 @@
                     }
                     resultHTML += `</div>`;
                     
-                    // Hiển thị trường "Đơn vị quản lý học phần" với styling đặc biệt
+                    // Hiển thị trường "Đơn vị quản lý học phần" với styling đặc biệt và chức năng click
                     if (item["Đơn vị quản lý học phần"]) {
                         resultHTML += `<div style="margin-top: 8px;">`;
-                        resultHTML += `<span style="background: #28a745; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 600;">📁 Đơn vị quản lý học phần: ${item["Đơn vị quản lý học phần"]}</span>`;
+                        resultHTML += `<span class="department-clickable" onclick="searchByDepartment('${item["Đơn vị quản lý học phần"]}')" style="background: #28a745; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.3s;" onmouseover="this.style.background='#20c997'; this.style.transform='scale(1.05)'" onmouseout="this.style.background='#28a745'; this.style.transform='scale(1)'" title="Click để xem tất cả học phần của đơn vị này">📁 Đơn vị quản lý học phần: ${item["Đơn vị quản lý học phần"]}</span>`;
                         resultHTML += `</div>`;
                     }
                     
@@ -1353,6 +1377,91 @@
 
         // Debounced search function - giảm delay để phản hồi nhanh hơn
         const debouncedSearch = debounce(showSuggestions, 150);
+
+        // Hàm tìm kiếm theo đơn vị quản lý học phần
+        function searchByDepartment(departmentName) {
+            const results = dictionaryData.filter(item => {
+                const itemDepartment = item['Đơn vị quản lý học phần'] || '';
+                return itemDepartment === departmentName;
+            });
+
+            const resultsContainer = document.getElementById('resultsContainer');
+            const searchInput = document.getElementById('searchInput');
+            
+            // Cập nhật search input
+            searchInput.value = `Đơn vị: ${departmentName}`;
+            
+            // Ẩn dropdown suggestions
+            document.getElementById('suggestionsDropdown').style.display = 'none';
+
+            if (results.length === 0) {
+                resultsContainer.innerHTML = '<div class="no-results">Không tìm thấy học phần nào của đơn vị này</div>';
+                return;
+            }
+
+            const totalItems = results.length;
+            
+            // Hiển thị header thông tin về đơn vị
+            let departmentHTML = `
+                <div style="background: linear-gradient(135deg, #28a745 0%, #20c997 100%); padding: 20px; border-radius: 12px; margin-bottom: 20px; text-align: center; color: white;">
+                    <h3 style="margin: 0 0 8px 0; font-size: 18px;">📁 ${departmentName}</h3>
+                    <p style="margin: 0; font-size: 14px; opacity: 0.9;">Tổng cộng: <strong>${totalItems}</strong> học phần</p>
+                </div>
+            `;
+
+            // Hiển thị từng học phần
+            departmentHTML += results.map(item => {
+                const fields = Object.keys(dataStructure);
+                let resultHTML = '<div class="result-item">';
+                
+                // Hiển thị trường đầu tiên làm title
+                const primaryField = fields[0];
+                const primaryValue = item[primaryField];
+                const secondaryField = fields[1];
+                const secondaryValue = item[secondaryField];
+                
+                resultHTML += `<div class="result-title">${String(primaryValue)}`;
+                if (secondaryValue && secondaryField !== primaryField) {
+                    resultHTML += ` <span style="font-size: 12px; color: #666; font-weight: normal;">- ${secondaryValue}</span>`;
+                }
+                resultHTML += `</div>`;
+                
+                // Hiển thị trường "Đơn vị quản lý học phần" với styling đặc biệt và chức năng click
+                if (item["Đơn vị quản lý học phần"]) {
+                    resultHTML += `<div style="margin-top: 8px;">`;
+                    resultHTML += `<span class="department-clickable" onclick="searchByDepartment('${item["Đơn vị quản lý học phần"]}')" style="background: #28a745; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.3s;" onmouseover="this.style.background='#20c997'" onmouseout="this.style.background='#28a745'">📁 Đơn vị quản lý học phần: ${item["Đơn vị quản lý học phần"]}</span>`;
+                    resultHTML += `</div>`;
+                }
+                
+                // Hiển thị các trường khác (trừ primary, secondary và "Đơn vị quản lý học phần")
+                fields.slice(2).forEach(fieldName => {
+                    if (fieldName === "Đơn vị quản lý học phần") return; // Skip vì đã hiển thị ở trên
+                    
+                    const value = item[fieldName];
+                    const fieldDisplay = dataStructure[fieldName].displayName;
+                    
+                    if (value) {
+                        if (Array.isArray(value)) {
+                            // Hiển thị array (tags)
+                            resultHTML += `<div style="margin-top: 8px;">`;
+                            resultHTML += `<span style="font-size: 11px; color: #888;">${fieldDisplay}: </span>`;
+                            resultHTML += value.map(tag => 
+                                `<span style="background: #e3f2fd; padding: 2px 6px; border-radius: 10px; font-size: 10px; margin-right: 4px; color: #1976d2;">${String(tag)}</span>`
+                            ).join('');
+                            resultHTML += `</div>`;
+                        } else {
+                            // Hiển thị text thường
+                            resultHTML += `<div class="result-description"><strong>${fieldDisplay}:</strong> ${String(value)}</div>`;
+                        }
+                    }
+                });
+                
+                resultHTML += '</div>';
+                return resultHTML;
+            }).join('');
+
+            resultsContainer.innerHTML = departmentHTML;
+        }
 
         // Event listeners
         document.addEventListener('DOMContentLoaded', function() {
@@ -1475,10 +1584,10 @@
                 }
                 resultHTML += `</div>`;
                 
-                // Hiển thị trường "Đơn vị quản lý học phần" với styling đặc biệt
+                // Hiển thị trường "Đơn vị quản lý học phần" với styling đặc biệt và chức năng click
                 if (item["Đơn vị quản lý học phần"]) {
                     resultHTML += `<div style="margin-top: 8px;">`;
-                    resultHTML += `<span style="background: #28a745; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 600;">📁 Đơn vị quản lý học phần: ${item["Đơn vị quản lý học phần"]}</span>`;
+                    resultHTML += `<span class="department-clickable" onclick="searchByDepartment('${item["Đơn vị quản lý học phần"]}')" style="background: #28a745; color: white; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.3s;" onmouseover="this.style.background='#20c997'; this.style.transform='scale(1.05)'" onmouseout="this.style.background='#28a745'; this.style.transform='scale(1)'" title="Click để xem tất cả học phần của đơn vị này">📁 Đơn vị quản lý học phần: ${item["Đơn vị quản lý học phần"]}</span>`;
                     resultHTML += `</div>`;
                 }
                 
