@@ -1398,13 +1398,40 @@
             return fieldName.charAt(0).toUpperCase() + fieldName.slice(1);
         }
 
-        // Get searchable value from field
+        // Remove Vietnamese accents for fuzzy search
+        function removeVietnameseAccents(str) {
+            return str
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '') // Remove combining diacritical marks
+                .replace(/đ/g, 'd')
+                .replace(/Đ/g, 'D');
+        }
+
+        // Get searchable value from field with fuzzy Vietnamese support
         function getSearchableValue(item, fieldName) {
             const value = item[fieldName];
+            let searchableText;
             if (Array.isArray(value)) {
-                return value.join(' ').toLowerCase();
+                searchableText = value.join(' ');
+            } else {
+                searchableText = String(value || '');
             }
-            return String(value || '').toLowerCase();
+            // Return both original lowercase and accent-removed version for matching
+            const original = searchableText.toLowerCase();
+            const noAccent = removeVietnameseAccents(original);
+            return { original, noAccent };
+        }
+
+        // Enhanced search function that checks both accented and non-accented text
+        function matchesSearchTerm(searchableValue, searchTerm) {
+            const term = searchTerm.toLowerCase();
+            const termNoAccent = removeVietnameseAccents(term);
+            
+            // Check if search term matches either original or accent-removed version
+            return searchableValue.original.includes(term) || 
+                   searchableValue.original.includes(termNoAccent) ||
+                   searchableValue.noAccent.includes(term) ||
+                   searchableValue.noAccent.includes(termNoAccent);
         }
 
         // Load dữ liệu từ file JSON
@@ -1488,35 +1515,43 @@
                 const tenViet = getSearchableValue(item, 'Tên tiếng Việt');
                 const tenAnh = getSearchableValue(item, 'Tên tiếng Anh');
                 
-                // Ưu tiên tìm kiếm trong các trường chính
-                return maHP.includes(searchLower) || 
-                       tenViet.includes(searchLower) || 
-                       tenAnh.includes(searchLower) ||
+                // Ưu tiên tìm kiếm trong các trường chính với fuzzy matching
+                return matchesSearchTerm(maHP, searchLower) || 
+                       matchesSearchTerm(tenViet, searchLower) || 
+                       matchesSearchTerm(tenAnh, searchLower) ||
                        // Tìm kiếm trong các trường khác
                        Object.keys(dataStructure).some(fieldName => {
                            if (['Mã HP', 'Tên tiếng Việt', 'Tên tiếng Anh'].includes(fieldName)) return false;
                            const searchableValue = getSearchableValue(item, fieldName);
-                           return searchableValue.includes(searchLower);
+                           return matchesSearchTerm(searchableValue, searchLower);
                        });
             })
-            // Sắp xếp kết quả theo độ ưu tiên
+            // Sắp xếp kết quả theo độ ưu tiên với fuzzy matching
             .sort((a, b) => {
                 const aCode = getSearchableValue(a, 'Mã HP');
                 const bCode = getSearchableValue(b, 'Mã HP');
                 const aViet = getSearchableValue(a, 'Tên tiếng Việt');
                 const bViet = getSearchableValue(b, 'Tên tiếng Việt');
                 
-                // Ưu tiên mã HP khớp chính xác
-                if (aCode === searchLower && bCode !== searchLower) return -1;
-                if (bCode === searchLower && aCode !== searchLower) return 1;
+                const searchLowerNoAccent = removeVietnameseAccents(searchLower);
+                
+                // Ưu tiên mã HP khớp chính xác (cả có dấu và không dấu)
+                const aCodeExact = aCode.original === searchLower || aCode.noAccent === searchLowerNoAccent;
+                const bCodeExact = bCode.original === searchLower || bCode.noAccent === searchLowerNoAccent;
+                if (aCodeExact && !bCodeExact) return -1;
+                if (bCodeExact && !aCodeExact) return 1;
                 
                 // Ưu tiên mã HP bắt đầu bằng search term
-                if (aCode.startsWith(searchLower) && !bCode.startsWith(searchLower)) return -1;
-                if (bCode.startsWith(searchLower) && !aCode.startsWith(searchLower)) return 1;
+                const aCodeStarts = aCode.original.startsWith(searchLower) || aCode.noAccent.startsWith(searchLowerNoAccent);
+                const bCodeStarts = bCode.original.startsWith(searchLower) || bCode.noAccent.startsWith(searchLowerNoAccent);
+                if (aCodeStarts && !bCodeStarts) return -1;
+                if (bCodeStarts && !aCodeStarts) return 1;
                 
                 // Ưu tiên tên tiếng Việt bắt đầu bằng search term
-                if (aViet.startsWith(searchLower) && !bViet.startsWith(searchLower)) return -1;
-                if (bViet.startsWith(searchLower) && !aViet.startsWith(searchLower)) return 1;
+                const aVietStarts = aViet.original.startsWith(searchLower) || aViet.noAccent.startsWith(searchLowerNoAccent);
+                const bVietStarts = bViet.original.startsWith(searchLower) || bViet.noAccent.startsWith(searchLowerNoAccent);
+                if (aVietStarts && !bVietStarts) return -1;
+                if (bVietStarts && !aVietStarts) return 1;
                 
                 return 0;
             })
@@ -1538,17 +1573,17 @@
                 let primaryText = '';
                 let matchedField = '';
                 
-                if (getSearchableValue(item, 'Mã HP').includes(searchLower)) {
-                    primaryText = maHP;
+                if (matchesSearchTerm(getSearchableValue(item, 'Mã HP'), searchLower)) {
+                    primaryText = item['Mã HP'];
                     matchedField = 'Mã HP';
-                } else if (getSearchableValue(item, 'Tên tiếng Việt').includes(searchLower)) {
-                    primaryText = tenViet;
+                } else if (matchesSearchTerm(getSearchableValue(item, 'Tên tiếng Việt'), searchLower)) {
+                    primaryText = item['Tên tiếng Việt'];
                     matchedField = 'Tên tiếng Việt';
-                } else if (getSearchableValue(item, 'Tên tiếng Anh').includes(searchLower)) {
-                    primaryText = tenAnh;
+                } else if (matchesSearchTerm(getSearchableValue(item, 'Tên tiếng Anh'), searchLower)) {
+                    primaryText = item['Tên tiếng Anh'];
                     matchedField = 'Tên tiếng Anh';
                 } else {
-                    primaryText = tenViet || maHP;
+                    primaryText = item['Tên tiếng Việt'] || item['Mã HP'];
                     matchedField = 'Tên tiếng Việt';
                 }
                 
@@ -1595,10 +1630,10 @@
                 results = dictionaryData.filter(item => {
                     const searchLower = term.toLowerCase();
                     
-                    // Tìm kiếm trong tất cả các trường
+                    // Tìm kiếm trong tất cả các trường với fuzzy matching
                     return Object.keys(dataStructure).some(fieldName => {
                         const searchableValue = getSearchableValue(item, fieldName);
-                        return searchableValue.includes(searchLower);
+                        return matchesSearchTerm(searchableValue, searchLower);
                     });
                 });
             }
@@ -1670,6 +1705,14 @@
 
             // Ẩn dropdown sau khi tìm kiếm
             document.getElementById('suggestionsDropdown').style.display = 'none';
+            
+            // Select all text in search box for easy replacement
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput && term) {
+                setTimeout(() => {
+                    searchInput.select();
+                }, 100); // Small delay to ensure the search completes
+            }
         }
 
         // Debounced search function - giảm delay để phản hồi nhanh hơn
@@ -1703,6 +1746,11 @@
 
             // Hiển thị kết quả giống như displayFilteredResults
             displayFilteredResults(results, fieldName, fieldValue);
+            
+            // Select all text in search box for easy replacement
+            setTimeout(() => {
+                searchInput.select();
+            }, 100);
         }
 
         // Hàm tìm kiếm theo đơn vị quản lý học phần (backward compatibility)
