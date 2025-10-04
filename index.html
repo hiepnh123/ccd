@@ -3471,7 +3471,7 @@
             showCategoryDropdown(item, event);
         }
 
-        // Show compact category dropdown
+        // Show compact category dropdown with smart positioning
         function showCategoryDropdown(item, event) {
             // Close any existing dropdown
             closeCategoryDropdown();
@@ -3481,9 +3481,31 @@
             
             const dropdown = document.createElement('div');
             dropdown.id = 'categoryDropdown';
+            
+            // Calculate dropdown height (approximately 5 items * 45px per item)
+            const dropdownHeight = 225; // 5 items × 45px per item
+            const viewportHeight = window.innerHeight;
+            const spaceBelow = viewportHeight - rect.bottom;
+            const spaceAbove = rect.top;
+            
+            // Determine if dropdown should appear above or below the button
+            let topPosition;
+            if (spaceBelow >= dropdownHeight + 10) {
+                // Enough space below - show dropdown below button
+                topPosition = rect.bottom + 5;
+            } else if (spaceAbove >= dropdownHeight + 10) {
+                // Not enough space below but enough above - show dropdown above button
+                topPosition = rect.top - dropdownHeight - 5;
+            } else {
+                // Limited space both directions - show above if more space, otherwise below
+                topPosition = spaceAbove > spaceBelow ? 
+                    Math.max(10, rect.top - dropdownHeight - 5) : 
+                    rect.bottom + 5;
+            }
+            
             dropdown.style.cssText = `
                 position: fixed;
-                top: ${rect.bottom + 5}px;
+                top: ${topPosition}px;
                 left: ${rect.left}px;
                 background: white;
                 border: 1px solid #ddd;
@@ -3493,6 +3515,8 @@
                 z-index: 1000;
                 min-width: 200px;
                 max-width: 250px;
+                max-height: ${Math.min(dropdownHeight, Math.max(spaceAbove, spaceBelow) - 20)}px;
+                overflow-y: auto;
             `;
             
             const categories = [
