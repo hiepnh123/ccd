@@ -91,8 +91,9 @@
 
         .main-container {
             padding: 0;
-            margin-top: 140px; /* Space for fixed header */
+            margin: 140px 0 0 0; /* Only top margin, remove any bottom margin */
             height: calc(100vh - 140px); /* Full remaining height */
+            overflow: hidden; /* Ensure no overflow creates gaps */
         }
 
         /* Login Modal */
@@ -401,6 +402,8 @@
             box-shadow: none;
             height: calc(100% - 120px);
             overflow: hidden;
+            margin: 0; /* Remove any margin */
+            padding: 0; /* Remove any padding */
         }
 
         .tab-content.active {
@@ -410,22 +413,25 @@
         .container {
             max-width: 1200px;
             margin: 0 auto;
+            padding: 20px 20px 10px 20px;
+            height: calc(100vh - 190px); /* Reduce height offset to get closer to bottom */
+            max-height: calc(100vh - 190px);
+            overflow-y: auto; /* Always show scrollbar when needed */
+            overflow-x: hidden;
             display: flex;
             gap: 20px;
-            height: 100%;
             align-items: stretch;
-            padding: 20px 20px 0 20px;
         }
 
         /* Phần tìm kiếm */
 .search-section {
-    flex: 1;
+    flex: none;
     background: white;
     padding: 30px;
     border-radius: 10px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
     height: fit-content;
-    align-self: flex-start; /* Align to top and maintain natural height */
+    align-self: flex-start;
 }
 
         .search-section h2 {
@@ -912,15 +918,16 @@
 
        /* Phần hiển thị kết quả */
 .results-section {
-    flex: 2;
+    flex: 1;
     background: white;
-    padding: 30px 30px 0 30px;
+    padding: 30px 30px 20px 30px;
     border-radius: 10px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-    overflow: visible;
+    overflow-y: auto;
     height: 100%;
     display: flex;
     flex-direction: column;
+    margin-bottom: 0;
 }
 
         .results-section h2 {
@@ -933,11 +940,8 @@
 
         #resultsContainer {
             flex: 1;
-            overflow-y: auto; /* Changed from scroll to auto - only show scrollbar when needed */
+            overflow-y: auto;
             overflow-x: hidden;
-            max-height: calc(100vh - 320px); /* Adjusted for flat design */
-            min-height: calc(100vh - 320px); /* Ensure container always takes full available height */
-            padding-bottom: 30px;
             padding-right: 5px;
         }
 
@@ -969,12 +973,19 @@
 
         .result-item {
             padding: 15px;
-            margin-bottom: 15px;
+            margin-bottom: 10px; /* Reduced from 15px to minimize spacing */
             border: 1px solid #eee;
             border-radius: 8px;
             background-color: #fafafa;
             transition: background-color 0.3s;
         }
+        
+        /* Remove margin from last result item to eliminate bottom gap */
+        .result-item:last-child {
+            margin-bottom: 0;
+        }
+
+
 
         .result-item:hover {
             background-color: #f0f0f0;
@@ -1578,7 +1589,7 @@
         let excelWorkbook = null; // Store loaded Excel workbook
         let selectedSheetNames = []; // Store multiple selected sheet names
         let isLoggedIn = false; // Authentication state
-        const ADMIN_PASSWORD = "admin@133"; // Change this to your desired password
+        const ADMIN_PASSWORD = "admin123"; // Change this to your desired password
         let detectedSheetFieldName = null; // Trường được phát hiện tự động chứa thông tin sheet
         let detectedCreditFieldName = null; // Trường được phát hiện tự động chứa thông tin số tín chỉ
         
@@ -4135,5 +4146,4 @@
     </script>
 </body>
 </html>
-
 
