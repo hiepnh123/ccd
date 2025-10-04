@@ -1741,10 +1741,10 @@
                 const fields = getOrderedFields();
                 let resultHTML = '<div class="result-item">';
                 
-                // Hiển thị trường đầu tiên làm title
-                const primaryField = fields[0];
+                // Hiển thị trường theo cài đặt display config
+                const primaryField = getPrimaryField();
                 const primaryValue = item[primaryField];
-                const secondaryField = fields[1];
+                const secondaryField = getSecondaryField();
                 const secondaryValue = item[secondaryField];
                 
                 resultHTML += `<div class="result-title" style="font-size: 16px; font-weight: bold; margin-bottom: 10px;">${String(primaryValue)}`;
@@ -1753,8 +1753,11 @@
                 }
                 resultHTML += `</div>`;
                 
-                // Section cho các badges quan trọng
-                resultHTML += `<div style="margin: 10px 0; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">`;
+                // Section cho các badges quan trọng và nút thêm - sử dụng justify-between để tách badge và nút
+                resultHTML += `<div style="margin: 10px 0; display: flex; justify-content: space-between; align-items: center; gap: 8px;">`;
+                
+                // Container cho các badge (bên trái)
+                resultHTML += `<div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">`;
                 
                 // Badge trường được filter (hiển thị với màu xanh da trời)
                 if (item[fieldName]) {
@@ -1773,7 +1776,26 @@
                     resultHTML += `<span class="clickable-badge department-badge" data-field="${escapeHtml(departmentField)}" data-value="${escapeHtml(item[departmentField])}" style="background: #28a745; color: white; padding: 4px 10px; border-radius: 15px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.3s; display: inline-block;" onmouseover="this.style.background='#20c997'; this.style.transform='scale(1.05)'" onmouseout="this.style.background='#28a745'; this.style.transform='scale(1)'" title="Click để xem tất cả học phần của đơn vị này">📁 ${item[departmentField]}</span>`;
                 }
                 
-                resultHTML += `</div>`;
+                resultHTML += `</div>`; // Đóng container badge
+                
+                // Add to program button (bên phải) - thêm ngay vào đây thay vì đặt riêng
+                ensureFieldDetection();
+                // Sử dụng cùng primary/secondary field với hiển thị
+                let checkPrimaryField = primaryField;
+                let checkSecondaryField = secondaryField;
+                
+                const isAlreadyAdded = selectedProgram.some(programItem => 
+                    programItem[checkPrimaryField] === item[checkPrimaryField] && 
+                    (checkSecondaryField ? programItem[checkSecondaryField] === item[checkSecondaryField] : true)
+                );
+                
+                if (isAlreadyAdded) {
+                    resultHTML += `<button class="add-to-program-btn added" disabled style="background: #4caf50; color: white; border: none; padding: 6px 16px; border-radius: 20px; font-size: 12px; cursor: default; opacity: 0.8; flex-shrink: 0;">✓ Đã thêm</button>`;
+                } else {
+                    resultHTML += `<button class="add-to-program-btn" onclick="addToProgram(${JSON.stringify(item).replace(/"/g, '&quot;')}, event)" style="background: #2196f3; color: white; border: none; padding: 6px 16px; border-radius: 20px; font-size: 12px; cursor: pointer; transition: all 0.3s; flex-shrink: 0;" onmouseover="this.style.background='#1976d2'" onmouseout="this.style.background='#2196f3'">➕ Thêm vào danh sách</button>`;
+                }
+                
+                resultHTML += `</div>`; // Đóng main flex container
                 
                 // Hiển thị các trường khác (theo cài đặt displayConfig)
                 fields.forEach(fieldDisplayName => {
@@ -1802,29 +1824,7 @@
                     }
                 });
 
-                // Add to program button
-                ensureFieldDetection();
-                let checkFields = getOrderedFields();
-                if (checkFields.length === 0 && selectedProgram.length > 0) {
-                    checkFields = Object.keys(selectedProgram[0]).filter(key => key !== '__category');
-                }
-                if (checkFields.length === 0) {
-                    checkFields = Object.keys(item).filter(key => key !== '__category');
-                }
-                let checkPrimaryField = checkFields[0];
-                let checkSecondaryField = checkFields[1];
-                
-                const isAlreadyAdded = selectedProgram.some(programItem => 
-                    programItem[checkPrimaryField] === item[checkPrimaryField] && 
-                    (checkSecondaryField ? programItem[checkSecondaryField] === item[checkSecondaryField] : true)
-                );
-                resultHTML += `<div style="margin-top: 15px; text-align: right;">`;
-                if (isAlreadyAdded) {
-                    resultHTML += `<button class="add-to-program-btn added" disabled style="background: #4caf50; color: white; border: none; padding: 6px 16px; border-radius: 20px; font-size: 12px; cursor: default; opacity: 0.8;">✓ Đã thêm</button>`;
-                } else {
-                    resultHTML += `<button class="add-to-program-btn" onclick="addToProgram(${JSON.stringify(item).replace(/"/g, '&quot;')}, event)" style="background: #2196f3; color: white; border: none; padding: 6px 16px; border-radius: 20px; font-size: 12px; cursor: pointer; transition: all 0.3s;" onmouseover="this.style.background='#1976d2'" onmouseout="this.style.background='#2196f3'">➕ Thêm vào danh sách</button>`;
-                }
-                resultHTML += `</div>`;
+                // Button đã được thêm vào cùng hàng với badge ở trên
 
                 resultHTML += '</div>';
                 return resultHTML;
@@ -2579,10 +2579,10 @@
                     const fields = getOrderedFields();
                     let resultHTML = '<div class="result-item">';
                     
-                    // Hiển thị trường đầu tiên làm title
-                    const primaryField = fields[0];
+                    // Hiển thị trường theo cài đặt display config
+                    const primaryField = getPrimaryField();
                     const primaryValue = item[primaryField];
-                    const secondaryField = fields[1];
+                    const secondaryField = getSecondaryField();
                     const secondaryValue = item[secondaryField];
                     
                     resultHTML += `<div class="result-title" style="font-size: 16px; font-weight: bold; margin-bottom: 10px;">${highlightText(String(primaryValue), term)}`;
@@ -2612,15 +2612,9 @@
                     
                     // Nút thêm vào chương trình (right side)
                     ensureFieldDetection();
-                    let btnCheckFields = getOrderedFields();
-                    if (btnCheckFields.length === 0 && selectedProgram.length > 0) {
-                        btnCheckFields = Object.keys(selectedProgram[0]).filter(key => key !== '__category');
-                    }
-                    if (btnCheckFields.length === 0) {
-                        btnCheckFields = Object.keys(item).filter(key => key !== '__category');
-                    }
-                    let btnCheckPrimaryField = btnCheckFields[0];
-                    let btnCheckSecondaryField = btnCheckFields[1];
+                    // Sử dụng cùng primary/secondary field với hiển thị
+                    let btnCheckPrimaryField = primaryField;
+                    let btnCheckSecondaryField = secondaryField;
                     
                     const btnIsAlreadyAdded = selectedProgram.some(programItem => 
                         programItem[btnCheckPrimaryField] === item[btnCheckPrimaryField] && 
