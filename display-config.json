@@ -1,0 +1,17 @@
+{
+  "primaryField": "Tên tiếng Việt",
+  "secondaryField": "Mã HP",
+  "showCreditBadge": true,
+  "showDepartmentBadge": true,
+  "fieldsToHide": [
+    "Quản lý",
+    "STT"
+  ],
+  "fieldsOrder": [
+    "Tên tiếng Việt",
+    "Tên tiếng Anh",
+    "Mã HP",
+    "Số TC"
+  ],
+  "lastUpdated": "2025-10-04T14:39:12.600Z"
+}
