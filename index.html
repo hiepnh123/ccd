@@ -3,7 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kiểm tra Học Phần - DNU</title>
+    <title>CCD - DNU</title>
+    
+    <!-- Favicon using emoji -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎯</text></svg>">
+    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         * {
@@ -242,8 +246,9 @@
             font-size: 16px;
             font-weight: 500;
             color: #666;
-            transition: all 0.3s;
+            transition: all 0.1s ease-out;
             border-right: 1px solid #ddd;
+            user-select: none;
         }
 
         .tab-button:last-child {
@@ -404,10 +409,13 @@
             overflow: hidden;
             margin: 0; /* Remove any margin */
             padding: 0; /* Remove any padding */
+            opacity: 0;
+            transition: opacity 0.15s ease-in-out;
         }
 
         .tab-content.active {
             display: block;
+            opacity: 1;
         }
 
         .container {
@@ -1964,7 +1972,28 @@
             }
         }
 
-        // Enhanced tab switching with login check
+        // Cache DOM elements for better performance
+        let tabElements = null;
+        let buttonElements = null;
+        
+        function initTabCache() {
+            if (!tabElements) {
+                tabElements = {
+                    search: document.getElementById('searchTab'),
+                    program: document.getElementById('programTab'),
+                    import: document.getElementById('importTab'),
+                    settings: document.getElementById('settingsTab')
+                };
+                buttonElements = {
+                    search: document.getElementById('searchTabBtn'),
+                    program: document.getElementById('programTabBtn'),
+                    import: document.getElementById('importTabBtn'),
+                    settings: document.getElementById('settingsTabBtn')
+                };
+            }
+        }
+
+        // Optimized tab switching with login check
         function switchTab(tabName) {
             // Check if trying to access admin tabs without login
             if ((tabName === 'import' || tabName === 'settings') && !isLoggedIn) {
@@ -1972,33 +2001,46 @@
                 return;
             }
             
-            // Hide all tabs
-            document.querySelectorAll('.tab-content').forEach(tab => {
-                tab.classList.remove('active');
+            // Initialize cache if needed
+            initTabCache();
+            
+            // Immediately update UI for responsiveness
+            // Hide all tabs and buttons
+            Object.values(tabElements).forEach(tab => {
+                if (tab) tab.classList.remove('active');
             });
-            document.querySelectorAll('.tab-button').forEach(btn => {
-                btn.classList.remove('active');
+            Object.values(buttonElements).forEach(btn => {
+                if (btn) btn.classList.remove('active');
             });
 
-            // Show selected tab
-            document.getElementById(tabName + 'Tab').classList.add('active');
-            
-            // Update active button
-            if (tabName === 'search') {
-                document.getElementById('searchTabBtn').classList.add('active');
-                // Refresh search results to update button states when switching to search tab
-                refreshCurrentView();
-            } else if (tabName === 'program') {
-                document.getElementById('programTabBtn').classList.add('active');
-                // Refresh program list when switching to program tab
-                renderProgramList();
-            } else if (tabName === 'import') {
-                document.getElementById('importTabBtn').classList.add('active');
-            } else if (tabName === 'settings') {
-                document.getElementById('settingsTabBtn').classList.add('active');
-                // Populate settings UI when switching to settings tab
-                populateSettingsUI();
+            // Show selected tab and button immediately
+            if (tabElements[tabName]) {
+                tabElements[tabName].classList.add('active');
             }
+            if (buttonElements[tabName]) {
+                buttonElements[tabName].classList.add('active');
+            }
+            
+            // Defer heavy operations using requestAnimationFrame for smooth UI
+            requestAnimationFrame(() => {
+                if (tabName === 'search') {
+                    // Only refresh if search has been used before
+                    if (document.getElementById('searchInput').value.trim() || 
+                        document.getElementById('resultsContainer').innerHTML.trim()) {
+                        refreshCurrentView();
+                    }
+                } else if (tabName === 'program') {
+                    // Only render if program has items
+                    if (selectedProgram && selectedProgram.length > 0) {
+                        renderProgramList();
+                    }
+                } else if (tabName === 'settings') {
+                    // Only populate if data structure exists
+                    if (Object.keys(dataStructure).length > 0) {
+                        populateSettingsUI();
+                    }
+                }
+            });
         }
 
         // Password input enter key support
@@ -2016,33 +2058,14 @@
                 }
             });
             
+            // Initialize tab cache for better performance
+            initTabCache();
+            
             // Initialize UI state
             updateUIForLoginState();
         });
 
-        // Original tab switching (keeping for compatibility)
-        function switchTab(tabName) {
-            // Hide all tabs
-            document.querySelectorAll('.tab-content').forEach(tab => {
-                tab.classList.remove('active');
-            });
-            document.querySelectorAll('.tab-button').forEach(btn => {
-                btn.classList.remove('active');
-            });
 
-            // Show selected tab
-            document.getElementById(tabName + 'Tab').classList.add('active');
-            event.target.classList.add('active');
-            
-            // Refresh content when switching tabs
-            if (tabName === 'search') {
-                // Refresh search results to update button states
-                refreshCurrentView();
-            } else if (tabName === 'program') {
-                // Refresh program list
-                renderProgramList();
-            }
-        }
 
         // Analyze JSON structure to get dynamic fields
         function analyzeDataStructure(data) {
@@ -2375,6 +2398,19 @@
             return displayConfig.secondaryField && fields.includes(displayConfig.secondaryField) 
                 ? displayConfig.secondaryField 
                 : fields[1];
+        }
+
+        // Lightweight refresh function for better performance
+        function refreshCurrentView() {
+            const searchInput = document.getElementById('searchInput');
+            const currentSearch = searchInput.value.trim();
+            
+            // If there's a search term, perform search, otherwise show all data
+            if (currentSearch) {
+                performSearch(currentSearch);
+            } else {
+                displayAllData();
+            }
         }
 
         // Get searchable value from field (with diacritics removed for fuzzy search)
