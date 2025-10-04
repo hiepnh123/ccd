@@ -281,8 +281,10 @@
         /* Program Tab Styles */
         .program-section {
             padding: 30px;
-            height: 100%;
-            overflow-y: auto;
+            height: calc(100vh - 200px); /* Fixed height to enable scrolling */
+            max-height: calc(100vh - 200px);
+            overflow-y: auto; /* Always show scrollbar when needed */
+            overflow-x: hidden;
         }
 
         .program-header {
@@ -562,8 +564,10 @@
         /* Import Tab Styles */
         .import-section {
             padding: 30px;
-            height: 100%;
-            overflow-y: auto;
+            height: calc(100vh - 200px); /* Fixed height to enable scrolling */
+            max-height: calc(100vh - 200px);
+            overflow-y: auto; /* Always show scrollbar when needed */
+            overflow-x: hidden;
         }
 
         .import-header {
@@ -929,10 +933,10 @@
 
         #resultsContainer {
             flex: 1;
-            overflow-y: scroll;
+            overflow-y: auto; /* Changed from scroll to auto - only show scrollbar when needed */
             overflow-x: hidden;
             max-height: calc(100vh - 320px); /* Adjusted for flat design */
-            min-height: 0;
+            min-height: calc(100vh - 320px); /* Ensure container always takes full available height */
             padding-bottom: 30px;
             padding-right: 5px;
         }
@@ -1016,6 +1020,10 @@
             max-width: 1200px;
             margin: 0 auto;
             padding: 20px;
+            height: calc(100vh - 200px); /* Fixed height to enable scrolling */
+            max-height: calc(100vh - 200px);
+            overflow-y: auto; /* Always show scrollbar when needed */
+            overflow-x: hidden;
         }
 
         .settings-header {
