@@ -3285,9 +3285,9 @@
             document.getElementById('sheetSelector').style.display = 'none';
 
             if (isMultipleSheets) {
-                showStatus(`Đã gộp ${selectedSheetNames.length} sheet: ${totalValidRows} dòng hợp lệ, ${totalInvalidRows} dòng bỏ qua`, 'success');
+                showStatus(`Đã gộp ${selectedSheetNames.length} sheet: ${totalValidRows} dòng hợp lệ, ${totalInvalidRows} dòng bỏ qua (thiếu dữ liệu)`, 'success');
             } else {
-                showStatus(`Đã xử lý: ${totalValidRows} dòng hợp lệ, ${totalInvalidRows} dòng bỏ qua`, 'success');
+                showStatus(`Đã xử lý: ${totalValidRows} dòng hợp lệ, ${totalInvalidRows} dòng bỏ qua (thiếu dữ liệu)`, 'success');
             }
             displayPreview();
         }
@@ -3314,8 +3314,9 @@
 
                 // Tạo object với tên field = tên header từ Excel
                 const rowData = {
-                    id: startId + validRows,
-                    isRequired: true  // Default to required when importing
+                    id: startId + validRows
+                    // Note: isRequired field is NOT added to database
+                    // It's only used for personal curriculum planning
                 };
                 
                 // Chỉ thêm trường tùy chỉnh khi có nhiều sheet
@@ -3323,26 +3324,33 @@
                     rowData[customFieldName] = sheetName;
                 }
 
-                let hasValidData = false;
+                let hasCompleteData = true; // Changed: require ALL fields to have data
+                let fieldCount = 0;
+                
                 headerRow.forEach((header, colIndex) => {
                     if (header && header.trim()) {
                         const fieldName = String(header).trim();
                         const cellValue = row[colIndex] ? String(row[colIndex]).trim() : '';
+                        fieldCount++;
                         
                         // Xử lý đặc biệt cho field có thể là array (tags, keywords, etc.)
                         if (fieldName.toLowerCase().includes('tag') || 
                             fieldName.toLowerCase().includes('keyword') ||
                             fieldName.toLowerCase().includes('từ khóa')) {
                             rowData[fieldName] = cellValue ? cellValue.split(',').map(tag => tag.trim()) : [];
+                            // For array fields, empty is acceptable
                         } else {
                             rowData[fieldName] = cellValue;
+                            // For regular fields, require non-empty value
+                            if (!cellValue || cellValue === '') {
+                                hasCompleteData = false;
+                            }
                         }
-                        
-                        if (cellValue) hasValidData = true;
                     }
                 });
 
-                if (hasValidData) {
+                // Only add rows that have complete data in ALL fields (except array fields)
+                if (hasCompleteData && fieldCount > 0) {
                     sheetData.push(rowData);
                     validRows++;
                 } else {
@@ -3362,14 +3370,33 @@
 
             if (pendingImportData.length === 0) return;
 
-            // Tạo headers động từ fields trong data
+            // Tạo headers động từ fields trong data (chỉ hiển thị các trường sẽ có trong database)
             const firstItem = pendingImportData[0];
-            const fields = Object.keys(firstItem).filter(key => key !== 'id' && key !== 'isRequired');
+            const allFields = Object.keys(firstItem).filter(key => key !== 'id' && key !== 'isRequired');
             
+            // Sắp xếp lại thứ tự cột: STT đầu tiên, sheet field cuối cùng
+            const orderedFields = [];
+            
+            // 1. STT luôn đầu tiên (tự động tạo)
+            orderedFields.push('STT');
+            
+            // 2. Các field khác (trừ STT và sheet field)
+            const sheetFieldName = detectedSheetFieldName || selectedSheetNames[0]; // Tên field chứa sheet name
+            allFields.forEach(field => {
+                if (field !== 'STT' && field !== sheetFieldName) {
+                    orderedFields.push(field);
+                }
+            });
+            
+            // 3. Sheet field cuối cùng (nếu có)
+            if (sheetFieldName && allFields.includes(sheetFieldName)) {
+                orderedFields.push(sheetFieldName);
+            }
+            
+            // Tạo header HTML
             tableHead.innerHTML = `
                 <tr>
-                    ${fields.map(field => `<th>${field}</th>`).join('')}
-                    <th>Bắt buộc/Tự chọn</th>
+                    ${orderedFields.map(field => `<th>${field}</th>`).join('')}
                 </tr>
             `;
 
@@ -3377,13 +3404,16 @@
             const previewData = pendingImportData.slice(0, 10);
             
             tableBody.innerHTML = previewData.map((item, index) => {
-                const isRequired = item.isRequired !== undefined ? item.isRequired : true;
-                const itemId = `preview_item_${index}_${Date.now()}`;
-                
                 return `
                     <tr>
-                        ${fields.map(field => {
-                            const value = item[field];
+                        ${orderedFields.map(field => {
+                            let value = item[field];
+                            
+                            // Xử lý STT đặc biệt
+                            if (field === 'STT') {
+                                value = index + 1;
+                            }
+                            
                             if (Array.isArray(value)) {
                                 // Hiển thị array như tags
                                 return `<td>${value.map(tag => `<span style="background: #f0f0f0; padding: 1px 6px; border-radius: 8px; font-size: 10px; margin-right: 3px;">${tag}</span>`).join('')}</td>`;
@@ -3394,36 +3424,15 @@
                                 return `<td>${truncated}</td>`;
                             }
                         }).join('')}
-                        <td>
-                            <div class="checkbox-container">
-                                <input type="checkbox" id="${itemId}" class="requirement-checkbox" 
-                                       ${isRequired ? 'checked' : ''} 
-                                       onchange="togglePreviewRequirement(${index})">
-                                <label for="${itemId}" class="requirement-label ${isRequired ? 'required' : 'elective'}">
-                                    ${isRequired ? 'Bắt buộc' : 'Tự chọn'}
-                                </label>
-                            </div>
-                        </td>
                     </tr>
                 `;
             }).join('');
 
             if (pendingImportData.length > 10) {
-                tableBody.innerHTML += `<tr><td colspan="${fields.length + 1}" style="text-align: center; font-style: italic; color: #666;">... và ${pendingImportData.length - 10} dòng khác</td></tr>`;
+                tableBody.innerHTML += `<tr><td colspan="${orderedFields.length}" style="text-align: center; font-style: italic; color: #666;">... và ${pendingImportData.length - 10} dòng khác</td></tr>`;
             }
 
             previewSection.style.display = 'block';
-        }
-
-        // Toggle requirement status for preview items
-        function togglePreviewRequirement(itemIndex) {
-            if (itemIndex >= 0 && itemIndex < pendingImportData.length) {
-                const item = pendingImportData[itemIndex];
-                item.isRequired = !item.isRequired;
-                
-                // Update the preview display
-                displayPreview();
-            }
         }
 
         function generateJSON() {
@@ -3435,14 +3444,17 @@
             try {
                 showStatus('Đang tạo file JSON...', 'success');
 
-                // Assign proper IDs to all items
-                pendingImportData.forEach((item, index) => {
-                    item.id = index + 1;
+                // Clean data for database - remove fields that shouldn't be in database
+                const cleanedData = pendingImportData.map((item, index) => {
+                    const cleanItem = { ...item };
+                    delete cleanItem.isRequired; // Remove isRequired from database
+                    cleanItem.id = index + 1;
+                    return cleanItem;
                 });
 
                 // Create new JSON file content
                 const newData = {
-                    dictionary: pendingImportData
+                    dictionary: cleanedData
                 };
 
                 // Create and download JSON file
@@ -3979,32 +3991,39 @@
             }
         }
 
-        // Export as simple text format
+        // Export as simple text format with table format
         function exportAsText() {
             ensureFieldDetection();
             const fields = Object.keys(dataStructure);
-            const primaryField = fields[0];
-            const secondaryField = fields[1];
+            const maHPField = fields[0];
+            const tenVietField = fields[1];
+            const tenAnhField = fields[2] || '';
             
             let content = `CHƯƠNG TRÌNH ĐÀO TẠO\n`;
             content += `Ngày xuất: ${new Date().toLocaleDateString('vi-VN')}\n`;
             content += `Tổng số học phần: ${selectedProgram.length}\n`;
             content += `Tổng số tín chỉ: ${programStats.credits}\n`;
             content += `Số đơn vị quản lý: ${programStats.departments}\n`;
-            content += `${'='.repeat(60)}\n\n`;
+            if (programStats.electiveRatio !== undefined) {
+                content += `Tỷ lệ Tự chọn/Bắt buộc: ${programStats.electiveRatio}%\n`;
+            }
+            content += `${'='.repeat(80)}\n\n`;
             
+            // Table header with proper spacing
+            content += `${'STT'.padEnd(5)}${'Mã HP'.padEnd(12)}${'Tên tiếng Việt'.padEnd(35)}${'Tên tiếng Anh'.padEnd(35)}${'Số TC'.padEnd(8)}${'Đơn vị quản lý'.padEnd(20)}${'Bắt buộc/Tự chọn'.padEnd(18)}\n`;
+            content += `${'-'.repeat(5)}${'-'.repeat(12)}${'-'.repeat(35)}${'-'.repeat(35)}${'-'.repeat(8)}${'-'.repeat(20)}${'-'.repeat(18)}\n`;
+            
+            // Table rows
             selectedProgram.forEach((item, index) => {
-                content += `${index + 1}. ${item[primaryField]}\n`;
-                if (item[secondaryField] && secondaryField !== primaryField) {
-                    content += `   ${item[secondaryField]}\n`;
-                }
-                if (detectedCreditFieldName && item[detectedCreditFieldName]) {
-                    content += `   Số tín chỉ: ${item[detectedCreditFieldName]}\n`;
-                }
-                if (detectedSheetFieldName && item[detectedSheetFieldName]) {
-                    content += `   Đơn vị quản lý: ${item[detectedSheetFieldName]}\n`;
-                }
-                content += `\n`;
+                const stt = String(index + 1).padEnd(5);
+                const maHP = String(item[maHPField] || '').padEnd(12);
+                const tenViet = String(item[tenVietField] || '').substring(0, 32).padEnd(35);
+                const tenAnh = String(item[tenAnhField] || '').substring(0, 32).padEnd(35);
+                const soTC = String(item[detectedCreditFieldName] || '').padEnd(8);
+                const donVi = String(item[detectedSheetFieldName] || '').substring(0, 17).padEnd(20);
+                const requirement = (item.isRequired ? 'Bắt buộc' : 'Tự chọn').padEnd(18);
+                
+                content += `${stt}${maHP}${tenViet}${tenAnh}${soTC}${donVi}${requirement}\n`;
             });
             
             downloadFile(content, 'chuong-trinh-dao-tao.txt', 'text/plain');
@@ -4376,5 +4395,4 @@
     </script>
 </body>
 </html>
-
 
