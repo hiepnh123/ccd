@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DNU - Chương trình đào tạo</title>
+    <title>Chương trình đào tạo - DNU</title>
     
     <!-- Favicon using emoji -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>☀️</text></svg>">
@@ -674,6 +674,44 @@
 
         .preview-table tr:hover {
             background: #f8f9fa;
+        }
+
+        /* Checkbox styles for required/elective column */
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            justify-content: center;
+        }
+
+        .requirement-checkbox {
+            width: 18px;
+            height: 18px;
+            margin: 0;
+            cursor: pointer;
+        }
+
+        .requirement-label {
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            user-select: none;
+            color: #495057;
+            padding: 2px 6px;
+            border-radius: 12px;
+            transition: all 0.2s;
+        }
+
+        .requirement-label.required {
+            background: #e3f2fd;
+            color: #1565c0;
+            border: 1px solid #bbdefb;
+        }
+
+        .requirement-label.elective {
+            background: #f3e5f5;
+            color: #7b1fa2;
+            border: 1px solid #e1bee7;
         }
 
         .import-actions {
@@ -1375,6 +1413,10 @@
                     <div class="stat-card">
                         <div class="stat-number" id="totalDepartments">0</div>
                         <div class="stat-label">Đơn vị</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="electiveRatio">0%</div>
+                        <div class="stat-label">Tự chọn/Bắt buộc</div>
                     </div>
                 </div>
                 
@@ -3272,7 +3314,8 @@
 
                 // Tạo object với tên field = tên header từ Excel
                 const rowData = {
-                    id: startId + validRows
+                    id: startId + validRows,
+                    isRequired: true  // Default to required when importing
                 };
                 
                 // Chỉ thêm trường tùy chỉnh khi có nhiều sheet
@@ -3321,18 +3364,22 @@
 
             // Tạo headers động từ fields trong data
             const firstItem = pendingImportData[0];
-            const fields = Object.keys(firstItem).filter(key => key !== 'id');
+            const fields = Object.keys(firstItem).filter(key => key !== 'id' && key !== 'isRequired');
             
             tableHead.innerHTML = `
                 <tr>
                     ${fields.map(field => `<th>${field}</th>`).join('')}
+                    <th>Bắt buộc/Tự chọn</th>
                 </tr>
             `;
 
             // Show max 10 rows for preview
             const previewData = pendingImportData.slice(0, 10);
             
-            tableBody.innerHTML = previewData.map(item => {
+            tableBody.innerHTML = previewData.map((item, index) => {
+                const isRequired = item.isRequired !== undefined ? item.isRequired : true;
+                const itemId = `preview_item_${index}_${Date.now()}`;
+                
                 return `
                     <tr>
                         ${fields.map(field => {
@@ -3347,15 +3394,36 @@
                                 return `<td>${truncated}</td>`;
                             }
                         }).join('')}
+                        <td>
+                            <div class="checkbox-container">
+                                <input type="checkbox" id="${itemId}" class="requirement-checkbox" 
+                                       ${isRequired ? 'checked' : ''} 
+                                       onchange="togglePreviewRequirement(${index})">
+                                <label for="${itemId}" class="requirement-label ${isRequired ? 'required' : 'elective'}">
+                                    ${isRequired ? 'Bắt buộc' : 'Tự chọn'}
+                                </label>
+                            </div>
+                        </td>
                     </tr>
                 `;
             }).join('');
 
             if (pendingImportData.length > 10) {
-                tableBody.innerHTML += `<tr><td colspan="${fields.length}" style="text-align: center; font-style: italic; color: #666;">... và ${pendingImportData.length - 10} dòng khác</td></tr>`;
+                tableBody.innerHTML += `<tr><td colspan="${fields.length + 1}" style="text-align: center; font-style: italic; color: #666;">... và ${pendingImportData.length - 10} dòng khác</td></tr>`;
             }
 
             previewSection.style.display = 'block';
+        }
+
+        // Toggle requirement status for preview items
+        function togglePreviewRequirement(itemIndex) {
+            if (itemIndex >= 0 && itemIndex < pendingImportData.length) {
+                const item = pendingImportData[itemIndex];
+                item.isRequired = !item.isRequired;
+                
+                // Update the preview display
+                displayPreview();
+            }
         }
 
         function generateJSON() {
@@ -3501,6 +3569,8 @@
             
             const subjects = selectedProgram.length;
             let totalCredits = 0;
+            let requiredCredits = 0;
+            let electiveCredits = 0;
             const departments = new Set();
             
             selectedProgram.forEach(item => {
@@ -3508,6 +3578,13 @@
                 if (detectedCreditFieldName && item[detectedCreditFieldName]) {
                     const credits = parseInt(item[detectedCreditFieldName]) || 0;
                     totalCredits += credits;
+                    
+                    // Calculate required vs elective credits
+                    if (item.isRequired === true) {
+                        requiredCredits += credits;
+                    } else {
+                        electiveCredits += credits;
+                    }
                 }
                 
                 // Track departments
@@ -3516,12 +3593,21 @@
                 }
             });
             
+            // Calculate elective to required ratio percentage
+            let electiveRatio = 0;
+            if (requiredCredits > 0) {
+                electiveRatio = Math.round((electiveCredits / requiredCredits) * 100);
+            } else if (electiveCredits > 0) {
+                electiveRatio = 100; // All credits are elective
+            }
+            
             // Update display
             document.getElementById('totalSubjects').textContent = subjects;
             document.getElementById('totalCredits').textContent = totalCredits;
             document.getElementById('totalDepartments').textContent = departments.size;
+            document.getElementById('electiveRatio').textContent = electiveRatio + '%';
             
-            programStats = { subjects, credits: totalCredits, departments: departments.size };
+            programStats = { subjects, credits: totalCredits, departments: departments.size, electiveRatio, requiredCredits, electiveCredits };
         }
 
         // Helper function to render add to program button
@@ -3671,8 +3757,8 @@
 
         // Add item to program with specific category
         function addToProgramWithCategory(item, category) {
-            // Add category to item
-            const itemWithCategory = { ...item, __category: category };
+            // Add category and default requirement status to item
+            const itemWithCategory = { ...item, __category: category, isRequired: true };
             
             // Add to program
             selectedProgram.push(itemWithCategory);
@@ -3724,6 +3810,47 @@
                 
                 // Show success feedback
                 showStatus(`Đã xóa "${item[primaryField]}" khỏi danh sách!`, 'success');
+            }
+        }
+
+        // Toggle requirement status for an item
+        function toggleRequirement(checkboxId, item) {
+            ensureFieldDetection();
+            
+            const checkbox = document.getElementById(checkboxId);
+            const label = document.querySelector(`label[for="${checkboxId}"]`);
+            
+            if (!checkbox || !label) return;
+            
+            const isRequired = checkbox.checked;
+            
+            // Find and update the item in selectedProgram
+            const fields = Object.keys(dataStructure);
+            const primaryField = fields[0];
+            const secondaryField = fields[1];
+            
+            const index = selectedProgram.findIndex(programItem => 
+                programItem[primaryField] === item[primaryField] && 
+                programItem[secondaryField] === item[secondaryField]
+            );
+            
+            if (index > -1) {
+                // Update the item in selectedProgram
+                selectedProgram[index].isRequired = isRequired;
+                
+                // Update label appearance and text
+                label.textContent = isRequired ? 'Bắt buộc' : 'Tự chọn';
+                label.className = `requirement-label ${isRequired ? 'required' : 'elective'}`;
+                
+                // Save to localStorage
+                localStorage.setItem('selectedProgram', JSON.stringify(selectedProgram));
+                
+                // Update program stats
+                updateProgramStats();
+                
+                // Show feedback
+                const status = isRequired ? 'Bắt buộc' : 'Tự chọn';
+                showStatus(`Đã cập nhật "${item[primaryField]}" thành ${status}!`, 'success');
             }
         }
 
@@ -4155,6 +4282,7 @@
                                         <th style="padding: 12px 10px; text-align: left; font-weight: 600; color: #495057; border-right: 1px solid #dee2e6; min-width: 180px;">Tên tiếng Anh</th>
                                         <th style="padding: 12px 8px; text-align: center; font-weight: 600; color: #495057; border-right: 1px solid #dee2e6; width: 70px;">Số TC</th>
                                         <th style="padding: 12px 10px; text-align: left; font-weight: 600; color: #495057; border-right: 1px solid #dee2e6; width: 120px;">Đơn vị quản lý</th>
+                                        <th style="padding: 12px 8px; text-align: center; font-weight: 600; color: #495057; border-right: 1px solid #dee2e6; width: 130px;">Bắt buộc/Tự chọn</th>
                                         <th style="padding: 12px 8px; text-align: center; font-weight: 600; color: #495057; width: 60px;">Xóa</th>
                                     </tr>
                                 </thead>
@@ -4170,6 +4298,12 @@
                         const soTC = item[creditField] || '';
                         const donVi = item[departmentField] || '';
                         
+                        // Generate unique ID for this item
+                        const itemId = `item_${maHP}_${index}_${Date.now()}`;
+                        
+                        // Check if item has requirement status, default to true (required)
+                        const isRequired = item.isRequired !== undefined ? item.isRequired : true;
+                        
                         programHTML += `
                             <tr style="border-bottom: 1px solid #dee2e6; transition: background-color 0.2s;" onmouseover="this.style.backgroundColor='#f8f9fa'" onmouseout="this.style.backgroundColor='white'">
                                 <td style="padding: 10px 8px; text-align: center; border-right: 1px solid #dee2e6; color: #6c757d; font-weight: 500;">${stt}</td>
@@ -4178,6 +4312,16 @@
                                 <td style="padding: 10px; border-right: 1px solid #dee2e6; color: #6c757d;">${tenAnh}</td>
                                 <td style="padding: 10px 8px; text-align: center; border-right: 1px solid #dee2e6; color: #495057; font-weight: 600;">${soTC}</td>
                                 <td style="padding: 10px; border-right: 1px solid #dee2e6; color: #6c757d; font-size: 12px;">${donVi}</td>
+                                <td style="padding: 10px 8px; text-align: center; border-right: 1px solid #dee2e6;">
+                                    <div class="checkbox-container">
+                                        <input type="checkbox" id="${itemId}" class="requirement-checkbox" 
+                                               ${isRequired ? 'checked' : ''} 
+                                               onchange="toggleRequirement('${itemId}', ${JSON.stringify(item).replace(/"/g, '&quot;')})">
+                                        <label for="${itemId}" class="requirement-label ${isRequired ? 'required' : 'elective'}">
+                                            ${isRequired ? 'Bắt buộc' : 'Tự chọn'}
+                                        </label>
+                                    </div>
+                                </td>
                                 <td style="padding: 10px 8px; text-align: center;">
                                     <button onclick="removeFromProgram(${JSON.stringify(item).replace(/"/g, '&quot;')})" 
                                             style="background: #dc3545; color: white; border: none; padding: 4px 6px; border-radius: 3px; font-size: 10px; cursor: pointer; transition: all 0.2s; min-width: 35px;" 
@@ -4232,5 +4376,4 @@
     </script>
 </body>
 </html>
-
 
