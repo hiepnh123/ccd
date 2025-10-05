@@ -1299,7 +1299,7 @@
             </div>
             <div class="header-actions">
                 <button id="loginBtn" class="login-btn" onclick="openLoginModal()">
-                    🔐 Admin Login
+                    🔐 Login
                 </button>
                 <button id="logoutBtn" class="logout-btn" onclick="logout()" style="display: none;">
                     🚪 Logout
@@ -1575,11 +1575,11 @@
     <div id="loginModal" class="login-modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h2>🔐 Admin Login</h2>
-                <p style="color: #666; font-size: 14px;">Nhập mật khẩu để truy cập chức năng quản trị</p>
+                <h2>🔐 Đăng Nhập Hệ Thống</h2>
+                <p style="color: #666; font-size: 14px;">Nhập mật khẩu để truy cập hệ thống</p>
             </div>
             <div class="modal-body">
-                <input type="password" id="passwordInput" class="password-input" placeholder="Nhập mật khẩu admin..." maxlength="50">
+                <input type="password" id="passwordInput" class="password-input" placeholder="Nhập mật khẩu..." maxlength="50">
                 <div id="errorMessage" class="error-message">Mật khẩu không đúng!</div>
             </div>
             <div class="modal-actions">
@@ -1597,7 +1597,9 @@
         let excelWorkbook = null; // Store loaded Excel workbook
         let selectedSheetNames = []; // Store multiple selected sheet names
         let isLoggedIn = false; // Authentication state
-        const ADMIN_PASSWORD = "admin123"; // Change this to your desired password
+        let userRole = null; // 'user' or 'admin'
+        const ADMIN_PASSWORD = "admin123"; // Admin password
+        const USER_PASSWORD = "dnu123"; // User password
         let detectedSheetFieldName = null; // Trường được phát hiện tự động chứa thông tin sheet
         let detectedCreditFieldName = null; // Trường được phát hiện tự động chứa thông tin số tín chỉ
         
@@ -1841,22 +1843,8 @@
                 
                 resultHTML += `</div>`; // Đóng container badge
                 
-                // Add to program button (bên phải) - thêm ngay vào đây thay vì đặt riêng
-                ensureFieldDetection();
-                // Sử dụng cùng primary/secondary field với hiển thị
-                let checkPrimaryField = primaryField;
-                let checkSecondaryField = secondaryField;
-                
-                const isAlreadyAdded = selectedProgram.some(programItem => 
-                    programItem[checkPrimaryField] === item[checkPrimaryField] && 
-                    (checkSecondaryField ? programItem[checkSecondaryField] === item[checkSecondaryField] : true)
-                );
-                
-                if (isAlreadyAdded) {
-                    resultHTML += `<button class="add-to-program-btn added" disabled style="background: #4caf50; color: white; border: none; padding: 6px 16px; border-radius: 20px; font-size: 12px; cursor: default; opacity: 0.8; flex-shrink: 0;">✓ Đã thêm</button>`;
-                } else {
-                    resultHTML += `<button class="add-to-program-btn" onclick="addToProgram(${JSON.stringify(item).replace(/"/g, '&quot;')}, event)" style="background: #2196f3; color: white; border: none; padding: 6px 16px; border-radius: 20px; font-size: 12px; cursor: pointer; transition: all 0.3s; flex-shrink: 0;" onmouseover="this.style.background='#1976d2'" onmouseout="this.style.background='#2196f3'">➕ Thêm vào danh sách</button>`;
-                }
+                // Add to program button (bên phải) - sử dụng helper function
+                resultHTML += renderAddToProgramButton(item, primaryField, secondaryField);
                 
                 resultHTML += `</div>`; // Đóng main flex container
                 
@@ -1914,10 +1902,20 @@
             
             if (password === ADMIN_PASSWORD) {
                 isLoggedIn = true;
-                localStorage.setItem('isLoggedIn', 'true'); // Save login state
+                userRole = 'admin';
+                localStorage.setItem('isLoggedIn', 'true');
+                localStorage.setItem('userRole', 'admin');
                 closeLoginModal();
                 updateUIForLoginState();
                 showStatus('Đăng nhập thành công! Chào mừng Admin.', 'success');
+            } else if (password === USER_PASSWORD) {
+                isLoggedIn = true;
+                userRole = 'user';
+                localStorage.setItem('isLoggedIn', 'true');
+                localStorage.setItem('userRole', 'user');
+                closeLoginModal();
+                updateUIForLoginState();
+                showStatus('Đăng nhập thành công! Chào mừng User.', 'success');
             } else {
                 errorMsg.style.display = 'block';
                 document.getElementById('passwordInput').value = '';
@@ -1926,12 +1924,15 @@
         }
 
         function logout() {
+            const currentRole = userRole;
             isLoggedIn = false;
-            localStorage.removeItem('isLoggedIn'); // Remove login state
+            userRole = null;
+            localStorage.removeItem('isLoggedIn');
+            localStorage.removeItem('userRole');
             updateUIForLoginState();
             // Switch back to search tab
             switchTab('search');
-            showStatus('Đã đăng xuất khỏi chế độ Admin.', 'error');
+            showStatus(`Đã đăng xuất khỏi chế độ ${currentRole === 'admin' ? 'Admin' : 'User'}.`, 'error');
         }
 
         function updateUIForLoginState() {
@@ -1939,36 +1940,74 @@
             const logoutBtn = document.getElementById('logoutBtn');
             const importTabBtn = document.getElementById('importTabBtn');
             const settingsTabBtn = document.getElementById('settingsTabBtn');
+            const programTabBtn = document.getElementById('programTabBtn');
             const tabContainer = document.getElementById('tabContainer');
             const searchTabBtn = document.getElementById('searchTabBtn');
             
             if (isLoggedIn) {
-                // Show admin controls
+                // Show user/admin controls
                 loginBtn.style.display = 'none';
                 logoutBtn.style.display = 'block';
-                importTabBtn.style.display = 'block';
-                settingsTabBtn.style.display = 'block';
                 tabContainer.classList.remove('not-logged-in');
+                
+                // Update logout button text based on role
+                if (userRole === 'admin') {
+                    logoutBtn.innerHTML = '🚪 Logout (Admin)';
+                } else if (userRole === 'user') {
+                    logoutBtn.innerHTML = '🚪 Logout (User)';
+                }
                 
                 // Show tab text
                 searchTabBtn.style.color = '';
-                importTabBtn.style.color = '';
-                settingsTabBtn.style.color = '';
+                programTabBtn.style.color = '';
                 
-                // Populate settings UI when admin logs in
-                if (Object.keys(dataStructure).length > 0) {
-                    populateSettingsUI();
+                if (userRole === 'admin') {
+                    // Admin: Show all tabs
+                    importTabBtn.style.display = 'block';
+                    settingsTabBtn.style.display = 'block';
+                    importTabBtn.style.color = '';
+                    settingsTabBtn.style.color = '';
+                    
+                    // Populate settings UI when admin logs in
+                    if (Object.keys(dataStructure).length > 0) {
+                        populateSettingsUI();
+                    }
+                } else if (userRole === 'user') {
+                    // User: Hide admin-only tabs
+                    importTabBtn.style.display = 'none';
+                    settingsTabBtn.style.display = 'none';
                 }
             } else {
-                // Hide admin controls
+                // Not logged in: Hide all privileged controls
                 loginBtn.style.display = 'block';
                 logoutBtn.style.display = 'none';
+                logoutBtn.innerHTML = '🚪 Logout'; // Reset to default
                 importTabBtn.style.display = 'none';
                 settingsTabBtn.style.display = 'none';
                 tabContainer.classList.add('not-logged-in');
                 
-                // Hide tab text
+                // Show Program tab publicly (always visible)
+                programTabBtn.style.display = 'block';
+                
+                // Show tab text for search and program tabs
                 searchTabBtn.style.color = 'transparent';
+                programTabBtn.style.color = ''; // Keep program tab text visible
+            }
+            
+            // Cập nhật lại tất cả các nút "Thêm vào danh sách" sau khi thay đổi trạng thái đăng nhập
+            refreshAddToListButtons();
+        }
+
+        // Hàm để cập nhật lại tất cả các nút "Thêm vào danh sách"
+        function refreshAddToListButtons() {
+            // Refresh lại kết quả tìm kiếm hiện tại để cập nhật trạng thái nút
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput && searchInput.value.trim()) {
+                // Nếu có từ khóa tìm kiếm, thực hiện lại tìm kiếm
+                performSearch();
+            } else {
+                // Nếu không có từ khóa, hiển thị lại tất cả dữ liệu
+                displayAllData();
             }
         }
 
@@ -1993,12 +2032,17 @@
             }
         }
 
-        // Optimized tab switching with login check
+        // Optimized tab switching with role-based access control
         function switchTab(tabName) {
-            // Check if trying to access admin tabs without login
-            if ((tabName === 'import' || tabName === 'settings') && !isLoggedIn) {
-                openLoginModal();
-                return;
+            // Check if trying to access admin-only tabs
+            if ((tabName === 'import' || tabName === 'settings')) {
+                if (!isLoggedIn) {
+                    openLoginModal();
+                    return;
+                } else if (userRole !== 'admin') {
+                    showStatus('⚠️ Chỉ có Admin mới có thể truy cập tab này!', 'error');
+                    return;
+                }
             }
             
             // Initialize cache if needed
@@ -2060,6 +2104,14 @@
             
             // Initialize tab cache for better performance
             initTabCache();
+            
+            // Restore login state from localStorage
+            const savedLoginState = localStorage.getItem('isLoggedIn');
+            const savedUserRole = localStorage.getItem('userRole');
+            if (savedLoginState === 'true' && savedUserRole) {
+                isLoggedIn = true;
+                userRole = savedUserRole;
+            }
             
             // Initialize UI state
             updateUIForLoginState();
@@ -2701,22 +2753,8 @@
                     
                     resultHTML += `</div>`; // Close badges container
                     
-                    // Nút thêm vào chương trình (right side)
-                    ensureFieldDetection();
-                    // Sử dụng cùng primary/secondary field với hiển thị
-                    let btnCheckPrimaryField = primaryField;
-                    let btnCheckSecondaryField = secondaryField;
-                    
-                    const btnIsAlreadyAdded = selectedProgram.some(programItem => 
-                        programItem[btnCheckPrimaryField] === item[btnCheckPrimaryField] && 
-                        (btnCheckSecondaryField ? programItem[btnCheckSecondaryField] === item[btnCheckSecondaryField] : true)
-                    );
-                    
-                    if (btnIsAlreadyAdded) {
-                        resultHTML += `<button class="add-to-program-btn added" disabled style="background: #4caf50; color: white; border: none; padding: 6px 16px; border-radius: 20px; font-size: 12px; cursor: default; opacity: 0.8;">✓ Đã thêm</button>`;
-                    } else {
-                        resultHTML += `<button class="add-to-program-btn" onclick="addToProgram(${JSON.stringify(item).replace(/"/g, '&quot;')}, event)" style="background: #2196f3; color: white; border: none; padding: 6px 16px; border-radius: 20px; font-size: 12px; cursor: pointer; transition: all 0.3s;" onmouseover="this.style.background='#1976d2'" onmouseout="this.style.background='#2196f3'">➕ Thêm vào danh sách</button>`;
-                    }
+                    // Nút thêm vào chương trình (right side) - sử dụng helper function
+                    resultHTML += renderAddToProgramButton(item, primaryField, secondaryField);
                     
                     resultHTML += `</div>`; // Close main badges section
                     
@@ -2966,17 +3004,8 @@
                 
                 resultHTML += `</div>`; // Close badges container
                 
-                // Nút thêm vào chương trình (right side)
-                const isAlreadyAdded = selectedProgram.some(programItem => 
-                    programItem[primaryField] === item[primaryField] && 
-                    (secondaryField ? programItem[secondaryField] === item[secondaryField] : true)
-                );
-                
-                if (isAlreadyAdded) {
-                    resultHTML += `<button class="add-to-program-btn" style="background: #4caf50; color: white; border: none; padding: 6px 16px; border-radius: 20px; font-size: 12px; cursor: default; opacity: 0.7;">✓ Đã thêm</button>`;
-                } else {
-                    resultHTML += `<button class="add-to-program-btn" onclick="addToProgram(${JSON.stringify(item).replace(/"/g, '&quot;')}, event)" style="background: #2196f3; color: white; border: none; padding: 6px 16px; border-radius: 20px; font-size: 12px; cursor: pointer; transition: all 0.3s;" onmouseover="this.style.background='#1976d2'" onmouseout="this.style.background='#2196f3'">➕ Thêm vào danh sách</button>`;
-                }
+                // Nút thêm vào chương trình (right side) - sử dụng helper function
+                resultHTML += renderAddToProgramButton(item, primaryField, secondaryField);
                 
                 resultHTML += `</div>`;
                 
@@ -3493,6 +3522,27 @@
             document.getElementById('totalDepartments').textContent = departments.size;
             
             programStats = { subjects, credits: totalCredits, departments: departments.size };
+        }
+
+        // Helper function to render add to program button
+        function renderAddToProgramButton(item, primaryField, secondaryField) {
+            ensureFieldDetection();
+            
+            // Không hiển thị nút nếu chưa đăng nhập
+            if (!isLoggedIn) {
+                return '';
+            }
+            
+            const isAlreadyAdded = selectedProgram.some(programItem => 
+                programItem[primaryField] === item[primaryField] && 
+                (secondaryField ? programItem[secondaryField] === item[secondaryField] : true)
+            );
+            
+            if (isAlreadyAdded) {
+                return `<button class="add-to-program-btn added" disabled style="background: #4caf50; color: white; border: none; padding: 6px 16px; border-radius: 20px; font-size: 12px; cursor: default; opacity: 0.8; flex-shrink: 0;">✓ Đã thêm</button>`;
+            }
+            
+            return `<button class="add-to-program-btn" onclick="addToProgram(${JSON.stringify(item).replace(/"/g, '&quot;')}, event)" style="background: #2196f3; color: white; border: none; padding: 6px 16px; border-radius: 20px; font-size: 12px; cursor: pointer; transition: all 0.3s; flex-shrink: 0;" onmouseover="this.style.background='#1976d2'" onmouseout="this.style.background='#2196f3'">➕ Thêm vào danh sách</button>`;
         }
 
         // Add to program with dropdown selection
