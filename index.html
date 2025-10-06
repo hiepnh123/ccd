@@ -373,6 +373,30 @@
             transform: translateY(-2px);
         }
 
+        .action-btn.tertiary {
+            background: #fff;
+            color: #4CAF50;
+            border: 2px solid #4CAF50;
+        }
+
+        .action-btn.tertiary:hover {
+            background: #4CAF50;
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .action-btn.tertiary {
+            background: #fff;
+            color: #4CAF50;
+            border: 2px solid #4CAF50;
+        }
+
+        .action-btn.tertiary:hover {
+            background: #4CAF50;
+            color: white;
+            transform: translateY(-2px);
+        }
+
         .program-list {
             background: #f8f9fa;
             border-radius: 12px;
@@ -682,6 +706,129 @@
             align-items: center;
             gap: 8px;
             justify-content: center;
+        }
+
+        /* Column Configuration Modal Styles */
+        .column-config-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 2000;
+        }
+
+        .column-config-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .column-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 15px;
+            margin: 8px 0;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #ddd;
+            cursor: move;
+            transition: all 0.3s;
+            user-select: none;
+        }
+
+        .column-item:hover {
+            background: #e9ecef;
+            transform: translateX(5px);
+        }
+
+        .column-item.dragging {
+            opacity: 0.5;
+            background: #fff3cd;
+        }
+
+        .column-item.drag-over {
+            border-left-color: #007bff;
+            background: #e3f2fd;
+        }
+
+        .column-checkbox {
+            margin-right: 15px;
+            transform: scale(1.2);
+        }
+
+        .column-label {
+            flex: 1;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .drag-handle {
+            color: #666;
+            font-size: 16px;
+            margin-left: 10px;
+            cursor: move;
+        }
+
+        .column-list {
+            margin: 20px 0;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .config-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 25px;
+            gap: 10px;
+        }
+
+        .config-btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            flex: 1;
+        }
+
+        .config-btn.primary {
+            background: #007bff;
+            color: white;
+        }
+
+        .config-btn.primary:hover {
+            background: #0056b3;
+        }
+
+        .config-btn.secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .config-btn.secondary:hover {
+            background: #545b62;
+        }
+
+        .config-btn.reset {
+            background: #dc3545;
+            color: white;
+        }
+
+        .config-btn.reset:hover {
+            background: #c82333;
         }
 
         .requirement-checkbox {
@@ -1426,6 +1573,9 @@
                     </button>
                     <button class="action-btn secondary" onclick="exportProgram()">
                         📤 Xuất danh sách
+                    </button>
+                    <button class="action-btn tertiary" onclick="showColumnConfigModal()">
+                        ⚙️ Cấu hình cột
                     </button>
                 </div>
                 
@@ -3717,6 +3867,7 @@
             const categories = [
                 { name: 'HP đại cương', icon: '🏛️', color: '#1976d2' },
                 { name: 'HP cơ sở ngành', icon: '🏗️', color: '#2e7d32' },
+                { name: 'HP khối ngành', icon: '📚', color: '#795548' },
                 { name: 'HP ngành', icon: '🎯', color: '#f57c00' },
                 { name: 'HP chuyên ngành', icon: '🔬', color: '#c2185b' },
                 { name: 'HP thực tập/tốt nghiệp', icon: '🎓', color: '#7b1fa2' }
@@ -4029,25 +4180,84 @@
             downloadFile(content, 'chuong-trinh-dao-tao.txt', 'text/plain');
         }
 
-        // Export as CSV format
+        // Export as CSV format - using dynamic column configuration
         function exportAsCSV() {
             ensureFieldDetection();
-            const fields = Object.keys(dataStructure);
             
-            // CSV Headers
-            const headers = fields.map(field => dataStructure[field].displayName);
+            // Auto-detect field names like in renderProgramList
+            let maHPField = null;
+            let tenVietField = null;
+            let tenAnhField = null;
+            let creditField = detectedCreditFieldName;
+            let departmentField = detectedSheetFieldName;
+            
+            if (selectedProgram.length > 0) {
+                const sampleItem = selectedProgram[0];
+                const fieldNames = Object.keys(sampleItem);
+                
+                maHPField = fieldNames.find(field => 
+                    field.toLowerCase().includes('mã') && field.toLowerCase().includes('hp')
+                ) || fieldNames.find(field => 
+                    field.toLowerCase().includes('code')
+                );
+                
+                tenVietField = fieldNames.find(field => 
+                    field.toLowerCase().includes('tên') && field.toLowerCase().includes('việt')
+                ) || fieldNames.find(field => 
+                    field.toLowerCase().includes('vietnamese') || field.toLowerCase().includes('name')
+                );
+                
+                tenAnhField = fieldNames.find(field => 
+                    field.toLowerCase().includes('tên') && field.toLowerCase().includes('anh')
+                ) || fieldNames.find(field => 
+                    field.toLowerCase().includes('english')
+                );
+            }
+            
+            // Use only visible columns from configuration
+            const visibleColumns = columnConfig.columns.filter(col => col.visible);
+            
+            // CSV Headers - using column configuration
+            const headers = visibleColumns.map(col => col.name);
             let csvContent = headers.join(',') + '\n';
             
-            // CSV Rows
-            selectedProgram.forEach(item => {
-                const row = fields.map(field => {
-                    const value = item[field] || '';
-                    // Escape quotes and wrap in quotes if contains comma
-                    const escaped = String(value).replace(/"/g, '""');
-                    return escaped.includes(',') ? `"${escaped}"` : escaped;
+            // CSV Rows - following the exact same logic as the table display
+            selectedProgram.forEach((item, index) => {
+                const stt = index + 1;
+                const maHP = item[maHPField] || '';
+                const tenViet = item[tenVietField] || '';
+                const tenAnh = item[tenAnhField] || '';
+                const soTC = item[creditField] || '';
+                const donVi = item[departmentField] || '';
+                const isRequired = item.isRequired !== undefined ? item.isRequired : true;
+                const batBuoc = isRequired ? 'Bắt buộc' : 'Tự chọn';
+                
+                // Prepare column data matching the table structure
+                const columnData = {
+                    stt: stt,
+                    maHP: maHP,
+                    tenViet: tenViet,
+                    tenAnh: tenAnh,
+                    soTC: soTC,
+                    donVi: donVi,
+                    batBuoc: batBuoc,
+                    xoa: '' // Skip export for delete column
+                };
+                
+                // Create row based on visible columns
+                const row = visibleColumns.map(column => {
+                    const value = columnData[column.id] || '';
+                    const strValue = String(value);
+                    const escaped = strValue.replace(/"/g, '""');
+                    return (escaped.includes(',') || escaped.includes(';') || escaped.includes('\n') || escaped.includes('\r') || escaped.includes('"')) ? `"${escaped}"` : escaped;
                 });
+                
                 csvContent += row.join(',') + '\n';
             });
+            
+            // Add UTF-8 BOM for proper Vietnamese character display in Excel
+            const BOM = '\uFEFF';
+            csvContent = BOM + csvContent;
             
             downloadFile(csvContent, 'chuong-trinh-dao-tao.csv', 'text/csv');
         }
@@ -4182,7 +4392,8 @@
 
         // Download file helper function
         function downloadFile(content, filename, mimeType) {
-            const blob = new Blob([content], { type: mimeType + ';charset=utf-8;' });
+            // Ensure proper UTF-8 encoding for CSV files
+            const blob = new Blob([content], { type: mimeType + ';charset=utf-8' });
             const link = document.createElement('a');
             
             if (link.download !== undefined) {
@@ -4253,6 +4464,7 @@
             const categories = {
                 'HP đại cương': { items: [], icon: '🏛️', color: '#1976d2', bgColor: '#e3f2fd' },
                 'HP cơ sở ngành': { items: [], icon: '🏗️', color: '#2e7d32', bgColor: '#e8f5e8' },
+                'HP khối ngành': { items: [], icon: '📚', color: '#795548', bgColor: '#efebe9' },
                 'HP ngành': { items: [], icon: '🎯', color: '#f57c00', bgColor: '#fff3e0' },
                 'HP chuyên ngành': { items: [], icon: '🔬', color: '#c2185b', bgColor: '#fce4ec' },
                 'HP thực tập/tốt nghiệp': { items: [], icon: '🎓', color: '#7b1fa2', bgColor: '#f3e5f5' }
@@ -4289,26 +4501,31 @@
                         </div>
                     `;
                     
-                    // Table for this category
+                    // Table for this category - using dynamic column configuration
                     programHTML += `
                         <div style="margin: 0 0 30px 20px; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                             <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
                                 <thead>
                                     <tr style="background: #f8f9fa; border-bottom: 2px solid #dee2e6;">
-                                        <th style="padding: 12px 8px; text-align: center; font-weight: 600; color: #495057; border-right: 1px solid #dee2e6; width: 50px;">STT</th>
-                                        <th style="padding: 12px 10px; text-align: left; font-weight: 600; color: #495057; border-right: 1px solid #dee2e6; width: 100px;">Mã HP</th>
-                                        <th style="padding: 12px 10px; text-align: left; font-weight: 600; color: #495057; border-right: 1px solid #dee2e6; min-width: 200px;">Tên tiếng Việt</th>
-                                        <th style="padding: 12px 10px; text-align: left; font-weight: 600; color: #495057; border-right: 1px solid #dee2e6; min-width: 180px;">Tên tiếng Anh</th>
-                                        <th style="padding: 12px 8px; text-align: center; font-weight: 600; color: #495057; border-right: 1px solid #dee2e6; width: 70px;">Số TC</th>
-                                        <th style="padding: 12px 10px; text-align: left; font-weight: 600; color: #495057; border-right: 1px solid #dee2e6; width: 120px;">Đơn vị quản lý</th>
-                                        <th style="padding: 12px 8px; text-align: center; font-weight: 600; color: #495057; border-right: 1px solid #dee2e6; width: 130px;">Bắt buộc/Tự chọn</th>
-                                        <th style="padding: 12px 8px; text-align: center; font-weight: 600; color: #495057; width: 60px;">Xóa</th>
+                    `;
+                    
+                    // Generate table headers based on column configuration
+                    const visibleColumns = columnConfig.columns.filter(col => col.visible);
+                    visibleColumns.forEach((column, index) => {
+                        const isLast = index === visibleColumns.length - 1;
+                        const borderStyle = isLast ? '' : 'border-right: 1px solid #dee2e6;';
+                        programHTML += `
+                            <th style="padding: 12px 8px; text-align: ${column.align}; font-weight: 600; color: #495057; ${borderStyle} width: ${column.width};">${column.name}</th>
+                        `;
+                    });
+                    
+                    programHTML += `
                                     </tr>
                                 </thead>
                                 <tbody>
                     `;
                     
-                    // Table rows for items in this category
+                    // Table rows for items in this category - using dynamic column configuration
                     categoryItems.forEach((item, index) => {
                         const stt = index + 1;
                         const maHP = item[maHPField] || '';
@@ -4323,33 +4540,72 @@
                         // Check if item has requirement status, default to true (required)
                         const isRequired = item.isRequired !== undefined ? item.isRequired : true;
                         
+                        // Prepare column data
+                        const columnData = {
+                            stt: stt,
+                            maHP: maHP,
+                            tenViet: tenViet,
+                            tenAnh: tenAnh,
+                            soTC: soTC,
+                            donVi: donVi,
+                            batBuoc: `
+                                <div class="checkbox-container">
+                                    <input type="checkbox" id="${itemId}" class="requirement-checkbox" 
+                                           ${isRequired ? 'checked' : ''} 
+                                           onchange="toggleRequirement('${itemId}', ${JSON.stringify(item).replace(/"/g, '&quot;')})">
+                                    <label for="${itemId}" class="requirement-label ${isRequired ? 'required' : 'elective'}">
+                                        ${isRequired ? 'Bắt buộc' : 'Tự chọn'}
+                                    </label>
+                                </div>
+                            `,
+                            xoa: `
+                                <button onclick="removeFromProgram(${JSON.stringify(item).replace(/"/g, '&quot;')})" 
+                                        style="background: #dc3545; color: white; border: none; padding: 4px 6px; border-radius: 3px; font-size: 10px; cursor: pointer; transition: all 0.2s; min-width: 35px;" 
+                                        onmouseover="this.style.background='#c82333'" 
+                                        onmouseout="this.style.background='#dc3545'" 
+                                        title="Xóa khỏi danh sách">✕</button>
+                            `
+                        };
+                        
                         programHTML += `
                             <tr style="border-bottom: 1px solid #dee2e6; transition: background-color 0.2s;" onmouseover="this.style.backgroundColor='#f8f9fa'" onmouseout="this.style.backgroundColor='white'">
-                                <td style="padding: 10px 8px; text-align: center; border-right: 1px solid #dee2e6; color: #6c757d; font-weight: 500;">${stt}</td>
-                                <td style="padding: 10px; border-right: 1px solid #dee2e6; color: #495057; font-weight: 500;">${maHP}</td>
-                                <td style="padding: 10px; border-right: 1px solid #dee2e6; color: #212529; font-weight: 500;">${tenViet}</td>
-                                <td style="padding: 10px; border-right: 1px solid #dee2e6; color: #6c757d;">${tenAnh}</td>
-                                <td style="padding: 10px 8px; text-align: center; border-right: 1px solid #dee2e6; color: #495057; font-weight: 600;">${soTC}</td>
-                                <td style="padding: 10px; border-right: 1px solid #dee2e6; color: #6c757d; font-size: 12px;">${donVi}</td>
-                                <td style="padding: 10px 8px; text-align: center; border-right: 1px solid #dee2e6;">
-                                    <div class="checkbox-container">
-                                        <input type="checkbox" id="${itemId}" class="requirement-checkbox" 
-                                               ${isRequired ? 'checked' : ''} 
-                                               onchange="toggleRequirement('${itemId}', ${JSON.stringify(item).replace(/"/g, '&quot;')})">
-                                        <label for="${itemId}" class="requirement-label ${isRequired ? 'required' : 'elective'}">
-                                            ${isRequired ? 'Bắt buộc' : 'Tự chọn'}
-                                        </label>
-                                    </div>
-                                </td>
-                                <td style="padding: 10px 8px; text-align: center;">
-                                    <button onclick="removeFromProgram(${JSON.stringify(item).replace(/"/g, '&quot;')})" 
-                                            style="background: #dc3545; color: white; border: none; padding: 4px 6px; border-radius: 3px; font-size: 10px; cursor: pointer; transition: all 0.2s; min-width: 35px;" 
-                                            onmouseover="this.style.background='#c82333'" 
-                                            onmouseout="this.style.background='#dc3545'" 
-                                            title="Xóa khỏi danh sách">✕</button>
-                                </td>
-                            </tr>
                         `;
+                        
+                        // Generate table cells based on column configuration
+                        visibleColumns.forEach((column, colIndex) => {
+                            const isLast = colIndex === visibleColumns.length - 1;
+                            const borderStyle = isLast ? '' : 'border-right: 1px solid #dee2e6;';
+                            const cellData = columnData[column.id] || '';
+                            
+                            // Apply different styles for different column types
+                            let cellStyle = `padding: 10px 8px; text-align: ${column.align}; ${borderStyle}`;
+                            let cellClass = '';
+                            
+                            switch (column.id) {
+                                case 'stt':
+                                    cellStyle += ' color: #6c757d; font-weight: 500;';
+                                    break;
+                                case 'maHP':
+                                    cellStyle += ' color: #495057; font-weight: 500;';
+                                    break;
+                                case 'tenViet':
+                                    cellStyle += ' color: #212529; font-weight: 500;';
+                                    break;
+                                case 'tenAnh':
+                                    cellStyle += ' color: #6c757d;';
+                                    break;
+                                case 'soTC':
+                                    cellStyle += ' color: #495057; font-weight: 600;';
+                                    break;
+                                case 'donVi':
+                                    cellStyle += ' color: #6c757d; font-size: 12px;';
+                                    break;
+                            }
+                            
+                            programHTML += `<td style="${cellStyle}">${cellData}</td>`;
+                        });
+                        
+                        programHTML += `</tr>`;
                     });
                     
                     programHTML += `
@@ -4387,12 +4643,183 @@
             }
         }
 
+        // Column Configuration System
+        let columnConfig = {
+            columns: [
+                { id: 'stt', name: 'STT', visible: true, width: '50px', align: 'center' },
+                { id: 'maHP', name: 'Mã HP', visible: true, width: '100px', align: 'left' },
+                { id: 'tenViet', name: 'Tên tiếng Việt', visible: true, width: '200px', align: 'left' },
+                { id: 'tenAnh', name: 'Tên tiếng Anh', visible: true, width: '180px', align: 'left' },
+                { id: 'soTC', name: 'Số TC', visible: true, width: '70px', align: 'center' },
+                { id: 'donVi', name: 'Đơn vị quản lý', visible: true, width: '120px', align: 'left' },
+                { id: 'batBuoc', name: 'Bắt buộc/Tự chọn', visible: true, width: '130px', align: 'center' },
+                { id: 'xoa', name: 'Xóa', visible: true, width: '60px', align: 'center' }
+            ]
+        };
+
+        // Load column configuration from localStorage
+        function loadColumnConfig() {
+            const saved = localStorage.getItem('columnConfig');
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    columnConfig = { ...columnConfig, ...parsed };
+                } catch (e) {
+                    console.log('Failed to load column config, using default');
+                }
+            }
+        }
+
+        // Save column configuration to localStorage
+        function saveColumnConfig() {
+            localStorage.setItem('columnConfig', JSON.stringify(columnConfig));
+        }
+
+        // Show column configuration modal
+        function showColumnConfigModal() {
+            const modal = document.getElementById('columnConfigModal');
+            const columnList = document.getElementById('columnList');
+            
+            // Populate column list
+            columnList.innerHTML = '';
+            columnConfig.columns.forEach((column, index) => {
+                const columnItem = document.createElement('div');
+                columnItem.className = 'column-item';
+                columnItem.draggable = true;
+                columnItem.dataset.columnId = column.id;
+                columnItem.dataset.index = index;
+                
+                columnItem.innerHTML = `
+                    <input type="checkbox" class="column-checkbox" ${column.visible ? 'checked' : ''} 
+                           onchange="toggleColumnVisibility('${column.id}', this.checked)">
+                    <span class="column-label">${column.name}</span>
+                    <span class="drag-handle">⋮⋮</span>
+                `;
+                
+                // Add drag event listeners
+                columnItem.addEventListener('dragstart', handleDragStart);
+                columnItem.addEventListener('dragover', handleDragOver);
+                columnItem.addEventListener('drop', handleDrop);
+                columnItem.addEventListener('dragend', handleDragEnd);
+                
+                columnList.appendChild(columnItem);
+            });
+            
+            modal.style.display = 'block';
+        }
+
+        // Close column configuration modal
+        function closeColumnConfigModal() {
+            document.getElementById('columnConfigModal').style.display = 'none';
+        }
+
+        // Toggle column visibility
+        function toggleColumnVisibility(columnId, visible) {
+            const column = columnConfig.columns.find(c => c.id === columnId);
+            if (column) {
+                column.visible = visible;
+            }
+        }
+
+        // Reset column configuration to default
+        function resetColumnConfig() {
+            columnConfig = {
+                columns: [
+                    { id: 'stt', name: 'STT', visible: true, width: '50px', align: 'center' },
+                    { id: 'maHP', name: 'Mã HP', visible: true, width: '100px', align: 'left' },
+                    { id: 'tenViet', name: 'Tên tiếng Việt', visible: true, width: '200px', align: 'left' },
+                    { id: 'tenAnh', name: 'Tên tiếng Anh', visible: true, width: '180px', align: 'left' },
+                    { id: 'soTC', name: 'Số TC', visible: true, width: '70px', align: 'center' },
+                    { id: 'donVi', name: 'Đơn vị quản lý', visible: true, width: '120px', align: 'left' },
+                    { id: 'batBuoc', name: 'Bắt buộc/Tự chọn', visible: true, width: '130px', align: 'center' },
+                    { id: 'xoa', name: 'Xóa', visible: true, width: '60px', align: 'center' }
+                ]
+            };
+            showColumnConfigModal(); // Refresh the modal
+        }
+
+        // Apply column configuration and refresh table
+        function applyColumnConfig() {
+            saveColumnConfig();
+            renderProgramList(); // Re-render the table with new configuration
+            closeColumnConfigModal();
+            showStatus('Đã áp dụng cấu hình cột mới!', 'success');
+        }
+
+        // Drag and drop handlers
+        let draggedElement = null;
+
+        function handleDragStart(e) {
+            draggedElement = this;
+            this.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/html', this.outerHTML);
+        }
+
+        function handleDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            this.classList.add('drag-over');
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            this.classList.remove('drag-over');
+            
+            if (this !== draggedElement) {
+                const draggedIndex = parseInt(draggedElement.dataset.index);
+                const targetIndex = parseInt(this.dataset.index);
+                
+                // Reorder columns in config
+                const draggedColumn = columnConfig.columns.splice(draggedIndex, 1)[0];
+                columnConfig.columns.splice(targetIndex, 0, draggedColumn);
+                
+                // Refresh the modal display
+                showColumnConfigModal();
+            }
+        }
+
+        function handleDragEnd(e) {
+            this.classList.remove('dragging');
+            document.querySelectorAll('.column-item').forEach(item => {
+                item.classList.remove('drag-over');
+            });
+        }
+
+        // Close modal when clicking outside
+        document.addEventListener('click', function(e) {
+            const modal = document.getElementById('columnConfigModal');
+            if (e.target === modal) {
+                closeColumnConfigModal();
+            }
+        });
+
         // Initialize when DOM is loaded
         document.addEventListener('DOMContentLoaded', function() {
+            loadColumnConfig();
             initializeApp();
         });
 
     </script>
+
+    <!-- Column Configuration Modal -->
+    <div id="columnConfigModal" class="column-config-modal">
+        <div class="column-config-content">
+            <h3 style="margin: 0 0 20px 0; color: #333; text-align: center;">⚙️ Cấu hình cột hiển thị</h3>
+            <p style="color: #666; text-align: center; margin-bottom: 25px;">Chọn cột hiển thị và sắp xếp thứ tự bằng cách kéo thả</p>
+            
+            <div class="column-list" id="columnList">
+                <!-- Will be populated dynamically -->
+            </div>
+            
+            <div class="config-buttons">
+                <button class="config-btn reset" onclick="resetColumnConfig()">🔄 Mặc định</button>
+                <button class="config-btn secondary" onclick="closeColumnConfigModal()">❌ Hủy</button>
+                <button class="config-btn primary" onclick="applyColumnConfig()">✅ Áp dụng</button>
+            </div>
+        </div>
+    </div>
+
 </body>
 </html>
 
