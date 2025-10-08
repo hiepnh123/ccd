@@ -4,7 +4,7 @@
   "showCreditBadge": true,
   "showDepartmentBadge": true,
   "fieldsToHide": [
-    "Quản lý",
+    "Đơn vị quản lý học phần",
     "STT"
   ],
   "fieldsOrder": [
@@ -13,5 +13,17 @@
     "Mã HP",
     "Số TC"
   ],
-  "lastUpdated": "2025-10-04T14:39:12.600Z"
+  "badgeFields": [
+    "Số TC",
+    "Đơn vị quản lý học phần"
+  ],
+  "badgeOrder": [
+    "Số TC",
+    "Đơn vị quản lý học phần",
+    "STT",
+    "Mã HP",
+    "Tên tiếng Việt",
+    "Tên tiếng Anh"
+  ],
+  "lastUpdated": "2025-10-08T10:29:41.969Z"
 }
