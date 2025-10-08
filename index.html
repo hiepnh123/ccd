@@ -3790,7 +3790,7 @@
                 return `<button class="add-to-program-btn added" disabled style="background: #4caf50; color: white; border: none; padding: 6px 16px; border-radius: 20px; font-size: 12px; cursor: default; opacity: 0.8; flex-shrink: 0;">✓ Đã thêm</button>`;
             }
             
-            return `<button class="add-to-program-btn" onclick="addToProgram(${JSON.stringify(item).replace(/"/g, '&quot;')}, event)" style="background: #2196f3; color: white; border: none; padding: 6px 16px; border-radius: 20px; font-size: 12px; cursor: pointer; transition: all 0.3s; flex-shrink: 0;" onmouseover="this.style.background='#1976d2'" onmouseout="this.style.background='#2196f3'">➕ Thêm vào danh sách</button>`;
+            return `<button class="add-to-program-btn" data-item-json='${JSON.stringify(item).replace(/'/g, "&#39;")}' style="background: #2196f3; color: white; border: none; padding: 6px 16px; border-radius: 20px; font-size: 12px; cursor: pointer; transition: all 0.3s; flex-shrink: 0;">➕ Thêm vào danh sách</button>`;
         }
 
         // Add to program with dropdown selection
@@ -3816,6 +3816,57 @@
             showCategoryDropdown(item, event);
         }
 
+        // Variables for hover dropdown management
+        let hoverTimeout;
+        let currentHoverItem = null;
+        
+        // Show dropdown on hover with delay
+        function showDropdownOnHover(item, event) {
+            // Clear any existing timeout
+            if (hoverTimeout) {
+                clearTimeout(hoverTimeout);
+            }
+            
+            // Set a small delay to avoid flickering
+            hoverTimeout = setTimeout(() => {
+                ensureFieldDetection();
+                
+                // Check if item already exists using same logic as addToProgram
+                const fields = Object.keys(dataStructure);
+                const primaryField = fields[0];
+                const secondaryField = fields[1];
+                
+                const isDuplicate = selectedProgram.some(selectedItem => {
+                    return selectedItem[primaryField] === item[primaryField] && 
+                           selectedItem[secondaryField] === item[secondaryField];
+                });
+                
+                if (!isDuplicate) {
+                    currentHoverItem = item;
+                    showCategoryDropdown(item, event);
+                }
+            }, 200); // 200ms delay
+        }
+        
+        // Hide dropdown on mouse leave with delay
+        function hideDropdownOnHover() {
+            // Clear show timeout if mouse leaves before showing
+            if (hoverTimeout) {
+                clearTimeout(hoverTimeout);
+            }
+            
+            // Set delay before hiding to allow mouse to move to dropdown
+            setTimeout(() => {
+                const dropdown = document.getElementById('categoryDropdown');
+                const isHoveringDropdown = dropdown && dropdown.matches(':hover');
+                
+                if (!isHoveringDropdown) {
+                    closeCategoryDropdown();
+                    currentHoverItem = null;
+                }
+            }, 300); // 300ms delay before hiding
+        }
+
         // Show compact category dropdown with smart positioning
         function showCategoryDropdown(item, event) {
             // Close any existing dropdown
@@ -3827,8 +3878,8 @@
             const dropdown = document.createElement('div');
             dropdown.id = 'categoryDropdown';
             
-            // Calculate dropdown height (approximately 5 items * 45px per item)
-            const dropdownHeight = 225; // 5 items × 45px per item
+            // Calculate dropdown height (approximately 6 items * 28px per item with compact padding)
+            const dropdownHeight = 168; // 6 items × 28px per item
             const viewportHeight = window.innerHeight;
             const spaceBelow = viewportHeight - rect.bottom;
             const spaceAbove = rect.top;
@@ -3860,8 +3911,8 @@
                 z-index: 1000;
                 min-width: 200px;
                 max-width: 250px;
-                max-height: ${Math.min(dropdownHeight, Math.max(spaceAbove, spaceBelow) - 20)}px;
-                overflow-y: auto;
+                max-height: none;
+                overflow-y: visible;
             `;
             
             const categories = [
@@ -3877,9 +3928,9 @@
             categories.forEach((category, index) => {
                 const option = document.createElement('div');
                 option.style.cssText = `
-                    padding: 10px 15px;
+                    padding: 6px 12px;
                     cursor: pointer;
-                    font-size: 13px;
+                    font-size: 12px;
                     color: ${category.color};
                     font-weight: 600;
                     border-bottom: ${index < categories.length - 1 ? '1px solid #f0f0f0' : 'none'};
@@ -3912,6 +3963,22 @@
             });
             
             document.body.appendChild(dropdown);
+            
+            // Add hover listeners to keep dropdown open when hovering over it
+            dropdown.addEventListener('mouseenter', () => {
+                // Clear any hide timeout when hovering over dropdown
+                if (hoverTimeout) {
+                    clearTimeout(hoverTimeout);
+                }
+            });
+            
+            dropdown.addEventListener('mouseleave', () => {
+                // Hide dropdown with delay when mouse leaves dropdown
+                setTimeout(() => {
+                    closeCategoryDropdown();
+                    currentHoverItem = null;
+                }, 200);
+            });
             
             // Close dropdown when clicking outside
             setTimeout(() => {
@@ -4007,9 +4074,8 @@
             buttonElement.disabled = true;
             buttonElement.style.cssText = 'background: #4caf50; color: white; border: none; padding: 6px 16px; border-radius: 20px; font-size: 12px; cursor: default; opacity: 0.8; flex-shrink: 0;';
             buttonElement.innerHTML = '✓ Đã thêm';
-            buttonElement.removeAttribute('onclick');
-            buttonElement.removeAttribute('onmouseover');
-            buttonElement.removeAttribute('onmouseout');
+            // Remove data attribute to prevent further interactions
+            buttonElement.removeAttribute('data-item-json');
         }
         
         // Optimized refresh that only updates necessary buttons instead of re-rendering everything
@@ -4023,10 +4089,19 @@
             // Find any other instances of the same button and update them
             const buttons = document.querySelectorAll('.add-to-program-btn:not(.added)');
             buttons.forEach(button => {
-                const onclick = button.getAttribute('onclick');
-                if (onclick && onclick.includes(addedItem[primaryField]) && 
-                    (!secondaryField || onclick.includes(addedItem[secondaryField]))) {
-                    updateButtonToAddedState(button);
+                const itemJson = button.getAttribute('data-item-json');
+                if (itemJson) {
+                    try {
+                        const buttonItem = JSON.parse(itemJson.replace(/&#39;/g, "'"));
+                        
+                        // Compare using the SAME logic as addToProgram duplicate check
+                        if (buttonItem[primaryField] === addedItem[primaryField] && 
+                            buttonItem[secondaryField] === addedItem[secondaryField]) {
+                            updateButtonToAddedState(button);
+                        }
+                    } catch (e) {
+                        console.error('Error parsing data-item-json for button update:', e);
+                    }
                 }
             });
         }
@@ -4945,6 +5020,57 @@
             programList.innerHTML = programHTML;
         }
 
+
+
+        // Setup global event delegation for add-to-program buttons (only once)
+        function setupGlobalEventDelegation() {
+            // Click handler
+            document.addEventListener('click', function(event) {
+                if (event.target.classList.contains('add-to-program-btn') && 
+                    !event.target.classList.contains('added')) {
+                    
+                    const itemJson = event.target.getAttribute('data-item-json');
+                    if (itemJson) {
+                        try {
+                            const item = JSON.parse(itemJson.replace(/&#39;/g, "'"));
+                            addToProgram(item, event);
+                        } catch (e) {
+                            console.error('Error parsing item JSON:', e);
+                        }
+                    }
+                }
+            });
+            
+            // Hover handler
+            document.addEventListener('mouseover', function(event) {
+                if (event.target.classList.contains('add-to-program-btn') && 
+                    !event.target.classList.contains('added')) {
+                    
+                    event.target.style.background = '#1976d2';
+                    
+                    const itemJson = event.target.getAttribute('data-item-json');
+                    if (itemJson) {
+                        try {
+                            const item = JSON.parse(itemJson.replace(/&#39;/g, "'"));
+                            showDropdownOnHover(item, event);
+                        } catch (e) {
+                            console.error('Error parsing item JSON for hover:', e);
+                        }
+                    }
+                }
+            });
+            
+            // Mouse leave handler
+            document.addEventListener('mouseout', function(event) {
+                if (event.target.classList.contains('add-to-program-btn') && 
+                    !event.target.classList.contains('added')) {
+                    
+                    event.target.style.background = '#2196f3';
+                    hideDropdownOnHover();
+                }
+            });
+        }
+
         // Initialize application
         function initializeApp() {
             // Load saved program from localStorage
@@ -5178,6 +5304,9 @@
                 console.log('Adding new prerequisite column...');
                 forceUpdateColumnConfig();
             }
+            
+            // Setup global event delegation for add-to-program buttons
+            setupGlobalEventDelegation();
             
             initializeApp();
         });
