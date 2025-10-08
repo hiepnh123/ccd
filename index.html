@@ -1712,15 +1712,8 @@
                         <h4>🏷️ Các Badge Hiển thị</h4>
                         <p class="config-desc">Các trường hiển thị dưới dạng badge có thể click</p>
                         
-                        <div class="badge-config">
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="showCreditBadge" checked>
-                                <span>Hiển thị Badge Tín chỉ</span>
-                            </label>
-                            <label class="checkbox-label">
-                                <input type="checkbox" id="showDepartmentBadge" checked>
-                                <span>Hiển thị Badge Đơn vị quản lý</span>
-                            </label>
+                        <div class="badge-config" id="dynamicBadgeConfig">
+                            <!-- Dynamic badge checkboxes will be generated here -->
                         </div>
                     </div>
 
@@ -1803,8 +1796,8 @@
         let displayConfig = {
             primaryField: 'Tên tiếng Việt',
             secondaryField: 'Mã HP', 
-            showCreditBadge: true,
-            showDepartmentBadge: true,
+            badgeFields: [], // Dynamic list of fields to show as badges
+            badgeOrder: [], // Order of badge fields for display
             fieldsToHide: ['STT', 'Số thứ tự', 'Đơn vị quản lý', 'Quản lý', 'id'],
             fieldsOrder: [] // Will be populated from dataStructure
         };
@@ -1812,8 +1805,8 @@
         const DEFAULT_CONFIG = {
             primaryField: 'Tên tiếng Việt',
             secondaryField: 'Mã HP',
-            showCreditBadge: true,
-            showDepartmentBadge: true,
+            badgeFields: [], // Will be auto-populated based on data
+            badgeOrder: [], // Will be auto-populated based on data
             fieldsToHide: ['STT', 'Số thứ tự', 'Đơn vị quản lý', 'Quản lý', 'id'],
             fieldsOrder: []
         };
@@ -2415,6 +2408,15 @@
                 if (response.ok) {
                     const config = await response.json();
                     displayConfig = { ...DEFAULT_CONFIG, ...config };
+                    
+                    // Ensure badgeFields and badgeOrder are arrays
+                    if (!Array.isArray(displayConfig.badgeFields)) {
+                        displayConfig.badgeFields = [];
+                    }
+                    if (!Array.isArray(displayConfig.badgeOrder)) {
+                        displayConfig.badgeOrder = [];
+                    }
+                    
                     console.log('Display settings loaded:', displayConfig);
                 } else {
                     console.log('No display config found, using defaults');
@@ -2435,6 +2437,8 @@
                     showDepartmentBadge: displayConfig.showDepartmentBadge,
                     fieldsToHide: displayConfig.fieldsToHide,
                     fieldsOrder: displayConfig.fieldsOrder,
+                    badgeFields: displayConfig.badgeFields || [],
+                    badgeOrder: displayConfig.badgeOrder || [],
                     lastUpdated: new Date().toISOString()
                 };
 
@@ -2465,8 +2469,21 @@
         function updateDisplayConfigFromUI() {
             displayConfig.primaryField = document.getElementById('primaryFieldSelect').value;
             displayConfig.secondaryField = document.getElementById('secondaryFieldSelect').value;
-            displayConfig.showCreditBadge = document.getElementById('showCreditBadge').checked;
-            displayConfig.showDepartmentBadge = document.getElementById('showDepartmentBadge').checked;
+            
+            // Update badge fields and order from sortable list
+            displayConfig.badgeFields = [];
+            displayConfig.badgeOrder = [];
+            
+            const badgeOrderItems = document.querySelectorAll('#badgeOrderContainer .badge-order-item');
+            badgeOrderItems.forEach(item => {
+                const fieldName = item.dataset.field;
+                const checkbox = item.querySelector('input[type="checkbox"]');
+                
+                displayConfig.badgeOrder.push(fieldName);
+                if (checkbox && checkbox.checked) {
+                    displayConfig.badgeFields.push(fieldName);
+                }
+            });
             
             // Update fields to hide
             const hideCheckboxes = document.querySelectorAll('#fieldsToHideContainer input[type="checkbox"]');
@@ -2480,6 +2497,211 @@
             // Update fields order
             const orderItems = document.querySelectorAll('#fieldsOrderContainer .field-order-item');
             displayConfig.fieldsOrder = Array.from(orderItems).map(item => item.dataset.field);
+        }
+
+        // Generate dynamic badge checkboxes based on available fields
+        function generateBadgeCheckboxes() {
+            const container = document.getElementById('dynamicBadgeConfig');
+            if (!container || !dictionaryData || dictionaryData.length === 0) return;
+            
+            // Get all available fields from the first data item
+            const sampleItem = dictionaryData[0];
+            const fields = Object.keys(sampleItem).filter(field => field !== 'id');
+            
+            // Auto-select default badge fields if not configured yet
+            if (!displayConfig.badgeFields || displayConfig.badgeFields.length === 0) {
+                // Try to find common credit and department fields
+                const creditFields = fields.filter(f => f.toLowerCase().includes('tc') || f.toLowerCase().includes('tín chỉ') || f.toLowerCase().includes('credit'));
+                const deptFields = fields.filter(f => f.toLowerCase().includes('quản lý') || f.toLowerCase().includes('đơn vị') || f.toLowerCase().includes('khoa'));
+                displayConfig.badgeFields = [...creditFields, ...deptFields];
+            }
+            
+            // Initialize badge order if not exists
+            if (!displayConfig.badgeOrder || displayConfig.badgeOrder.length === 0) {
+                displayConfig.badgeOrder = [...fields];
+            }
+            
+            // Clear existing content and create sortable container
+            container.innerHTML = `
+                <div style="margin-bottom: 15px;">
+                    <h5 style="margin: 0 0 10px 0; color: #666;">🎯 Chọn và sắp xếp thứ tự badges:</h5>
+                    <p style="font-size: 12px; color: #999; margin: 0 0 10px 0;">Kéo thả để thay đổi thứ tự hiển thị</p>
+                    <div id="badgeOrderContainer" style="max-height: 200px; overflow-y: auto; border: 1px solid #ddd; border-radius: 6px; padding: 8px;">
+                        <!-- Sortable badge items will be added here -->
+                    </div>
+                </div>
+            `;
+            
+            const orderContainer = document.getElementById('badgeOrderContainer');
+            
+            // Create sortable items based on current order
+            displayConfig.badgeOrder.forEach(fieldName => {
+                if (fields.includes(fieldName)) {
+                    const isChecked = displayConfig.badgeFields && displayConfig.badgeFields.includes(fieldName);
+                    const badgeItem = document.createElement('div');
+                    badgeItem.className = 'badge-order-item';
+                    badgeItem.draggable = true;
+                    badgeItem.dataset.field = fieldName;
+                    badgeItem.style.cssText = `
+                        display: flex;
+                        align-items: center;
+                        padding: 8px 12px;
+                        margin: 4px 0;
+                        background: ${isChecked ? '#e3f2fd' : '#f5f5f5'};
+                        border: 1px solid ${isChecked ? '#2196f3' : '#ddd'};
+                        border-radius: 6px;
+                        cursor: move;
+                        user-select: none;
+                        transition: all 0.3s;
+                    `;
+                    
+                    badgeItem.innerHTML = `
+                        <span style="margin-right: 8px; color: #666;">⋮⋮</span>
+                        <label style="display: flex; align-items: center; cursor: pointer; flex: 1;">
+                            <input type="checkbox" ${isChecked ? 'checked' : ''} style="margin-right: 8px;" onchange="updateBadgeSelection('${fieldName}', this.checked)">
+                            <span>Badge ${fieldName}</span>
+                        </label>
+                    `;
+                    
+                    // Add drag and drop event listeners
+                    badgeItem.addEventListener('dragstart', handleBadgeDragStart);
+                    badgeItem.addEventListener('dragover', handleBadgeDragOver);
+                    badgeItem.addEventListener('drop', handleBadgeDrop);
+                    badgeItem.addEventListener('dragend', handleBadgeDragEnd);
+                    
+                    orderContainer.appendChild(badgeItem);
+                }
+            });
+        }
+
+        // Update badge selection when checkbox is changed
+        function updateBadgeSelection(fieldName, isChecked) {
+            if (!displayConfig.badgeFields) {
+                displayConfig.badgeFields = [];
+            }
+            
+            if (isChecked) {
+                if (!displayConfig.badgeFields.includes(fieldName)) {
+                    displayConfig.badgeFields.push(fieldName);
+                }
+            } else {
+                displayConfig.badgeFields = displayConfig.badgeFields.filter(f => f !== fieldName);
+            }
+            
+            // Update visual appearance of the item
+            const badgeItem = document.querySelector(`[data-field="${fieldName}"]`);
+            if (badgeItem) {
+                badgeItem.style.background = isChecked ? '#e3f2fd' : '#f5f5f5';
+                badgeItem.style.borderColor = isChecked ? '#2196f3' : '#ddd';
+            }
+        }
+
+        // Drag and drop handlers for badge ordering
+        let draggedBadgeElement = null;
+
+        function handleBadgeDragStart(e) {
+            draggedBadgeElement = this;
+            this.style.opacity = '0.5';
+            e.dataTransfer.effectAllowed = 'move';
+        }
+
+        function handleBadgeDragOver(e) {
+            if (e.preventDefault) {
+                e.preventDefault();
+            }
+            e.dataTransfer.dropEffect = 'move';
+            return false;
+        }
+
+        function handleBadgeDrop(e) {
+            if (e.stopPropagation) {
+                e.stopPropagation();
+            }
+
+            if (draggedBadgeElement !== this) {
+                const container = document.getElementById('badgeOrderContainer');
+                const items = Array.from(container.children);
+                const draggedIndex = items.indexOf(draggedBadgeElement);
+                const targetIndex = items.indexOf(this);
+
+                if (draggedIndex < targetIndex) {
+                    container.insertBefore(draggedBadgeElement, this.nextSibling);
+                } else {
+                    container.insertBefore(draggedBadgeElement, this);
+                }
+
+                // Update badge order in config
+                const newOrder = Array.from(container.children).map(item => item.dataset.field);
+                displayConfig.badgeOrder = newOrder;
+            }
+
+            return false;
+        }
+
+        function handleBadgeDragEnd(e) {
+            this.style.opacity = '1';
+            draggedBadgeElement = null;
+        }
+
+        // Generate dynamic badges HTML for an item (now respects order)
+        function generateDynamicBadgesHTML(item) {
+            let badgesHTML = '';
+            
+            if (displayConfig.badgeFields && displayConfig.badgeFields.length > 0 && displayConfig.badgeOrder) {
+                // Sort badgeFields according to badgeOrder
+                const sortedBadgeFields = displayConfig.badgeOrder.filter(field => 
+                    displayConfig.badgeFields.includes(field)
+                );
+                
+                sortedBadgeFields.forEach((fieldName, index) => {
+                    if (item[fieldName]) {
+                        // Determine icon and display format based on field type
+                        let icon = '';
+                        let displayValue = item[fieldName];
+                        let color = '#2196f3'; // default blue
+                        
+                        // Check if this is a credit field
+                        if (fieldName.toLowerCase().includes('tc') || 
+                            fieldName.toLowerCase().includes('tín chỉ') || 
+                            fieldName.toLowerCase().includes('credit') ||
+                            fieldName.toLowerCase().includes('số tc')) {
+                            icon = '📊 ';
+                            displayValue = `${item[fieldName]} TC`;
+                            color = '#ff9800'; // orange for credits
+                        }
+                        // Check if this is a department/management field
+                        else if (fieldName.toLowerCase().includes('quản lý') || 
+                                fieldName.toLowerCase().includes('đơn vị') || 
+                                fieldName.toLowerCase().includes('khoa') ||
+                                fieldName.toLowerCase().includes('department')) {
+                            icon = '📁 ';
+                            color = '#4caf50'; // green for departments
+                        }
+                        // Check for code fields
+                        else if (fieldName.toLowerCase().includes('mã') || 
+                                fieldName.toLowerCase().includes('code')) {
+                            icon = '🏷️ ';
+                            color = '#9c27b0'; // purple for codes
+                        }
+                        // Check for name fields
+                        else if (fieldName.toLowerCase().includes('tên') || 
+                                fieldName.toLowerCase().includes('name')) {
+                            icon = '📖 ';
+                            color = '#2196f3'; // blue for names
+                        }
+                        // Default for other fields
+                        else {
+                            const colors = ['#f44336', '#ff5722', '#795548', '#607d8b', '#3f51b5'];
+                            color = colors[index % colors.length];
+                            icon = '🔹 ';
+                        }
+                        
+                        badgesHTML += `<span class="clickable-badge dynamic-badge" data-field="${escapeHtml(fieldName)}" data-value="${escapeHtml(item[fieldName])}" style="background: ${color}; color: white; padding: 4px 10px; border-radius: 15px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.3s; display: inline-block; margin-right: 8px;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'" title="Click để lọc theo ${fieldName}: ${item[fieldName]}">${icon}${displayValue}</span>`;
+                    }
+                });
+            }
+            
+            return badgesHTML;
         }
 
         function resetDisplaySettings() {
@@ -2514,9 +2736,8 @@
                 secondarySelect.innerHTML += `<option value="${field}" ${field === displayConfig.secondaryField ? 'selected' : ''}>${field}</option>`;
             });
 
-            // Set badge checkboxes
-            document.getElementById('showCreditBadge').checked = displayConfig.showCreditBadge;
-            document.getElementById('showDepartmentBadge').checked = displayConfig.showDepartmentBadge;
+            // Generate dynamic badge checkboxes based on available fields
+            generateBadgeCheckboxes();
 
             // Populate fields to hide
             const hideContainer = document.getElementById('fieldsToHideContainer');
@@ -2691,6 +2912,9 @@
                 // Tự động phát hiện các trường quan trọng
                 const detectedSheetField = detectSheetFieldName();
                 const detectedCreditField = detectCreditFieldName();
+                
+                // Generate dynamic badge checkboxes after data is loaded
+                generateBadgeCheckboxes();
                 console.log('Sheet field detected:', detectedSheetField);
                 console.log('Credit field detected:', detectedCreditField);
                 
@@ -2932,12 +3156,8 @@
                     // Badges container (left side)
                     resultHTML += `<div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">`;
                     
-                    // Badge Credit (nếu có)
-                    if (detectedCreditFieldName && item[detectedCreditFieldName]) {
-                        resultHTML += `<span class="clickable-badge credit-badge" data-field="${escapeHtml(detectedCreditFieldName)}" data-value="${escapeHtml(item[detectedCreditFieldName])}" style="background: #ff9800; color: white; padding: 4px 10px; border-radius: 15px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.3s; display: inline-block;" onmouseover="this.style.background='#f57f17'; this.style.transform='scale(1.05)'" onmouseout="this.style.background='#ff9800'; this.style.transform='scale(1)'" title="Click để lọc theo ${detectedCreditFieldName}: ${item[detectedCreditFieldName]}">📊 ${item[detectedCreditFieldName]} TC</span>`;
-                    }
-                    
-                    // Badge Tên học phần (nếu có)
+                    // Dynamic badges based on user configuration
+                    resultHTML += generateDynamicBadgesHTML(item);
                     const departmentField = 'Quản lý';
                     if (item[departmentField]) {
                         resultHTML += `<span class="clickable-badge department-badge" data-field="${escapeHtml(departmentField)}" data-value="${escapeHtml(item[departmentField])}" style="background: #28a745; color: white; padding: 4px 10px; border-radius: 15px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.3s; display: inline-block;" onmouseover="this.style.background='#20c997'; this.style.transform='scale(1.05)'" onmouseout="this.style.background='#28a745'; this.style.transform='scale(1)'" title="Click để xem tất cả học phần của đơn vị này">📁 ${item[departmentField]}</span>`;
@@ -3183,16 +3403,8 @@
                 // Badges container (left side)
                 resultHTML += `<div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">`;
                 
-                // Badge Credit (nếu có)
-                if (detectedCreditFieldName && item[detectedCreditFieldName]) {
-                    resultHTML += `<span class="clickable-badge credit-badge" data-field="${escapeHtml(detectedCreditFieldName)}" data-value="${escapeHtml(item[detectedCreditFieldName])}" style="background: #ff9800; color: white; padding: 4px 10px; border-radius: 15px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.3s; display: inline-block;" onmouseover="this.style.background='#f57f17'; this.style.transform='scale(1.05)'" onmouseout="this.style.background='#ff9800'; this.style.transform='scale(1)'" title="Click để lọc theo ${detectedCreditFieldName}: ${item[detectedCreditFieldName]}">📊 ${item[detectedCreditFieldName]} TC</span>`;
-                }
-                
-                // Badge Tên học phần (nếu có)
-                const departmentField = 'Quản lý';
-                if (item[departmentField]) {
-                    resultHTML += `<span class="clickable-badge department-badge" data-field="${escapeHtml(departmentField)}" data-value="${escapeHtml(item[departmentField])}" style="background: #28a745; color: white; padding: 4px 10px; border-radius: 15px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.3s; display: inline-block;" onmouseover="this.style.background='#20c997'; this.style.transform='scale(1.05)'" onmouseout="this.style.background='#28a745'; this.style.transform='scale(1)'" title="Click để xem tất cả học phần của đơn vị này">📁 ${item[departmentField]}</span>`;
-                }
+                // Dynamic badges based on user configuration
+                resultHTML += generateDynamicBadgesHTML(item);
                 
                 resultHTML += `</div>`; // Close badges container
                 
