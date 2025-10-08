@@ -1472,6 +1472,12 @@
                 grid-template-columns: 1fr;
             }
         }
+
+        /* Badge spacing optimization */
+        .clickable-badge {
+            margin-right: 4px !important;
+            margin-bottom: 2px;
+        }
     </style>
 </head>
 <body>
@@ -2007,7 +2013,7 @@
                 resultHTML += `<div style="margin: 10px 0; display: flex; justify-content: space-between; align-items: center; gap: 8px;">`;
                 
                 // Container cho các badge (bên trái)
-                resultHTML += `<div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">`;
+                resultHTML += `<div style="display: flex; gap: 4px; align-items: center; flex-wrap: wrap;">`;
                 
                 // Badge trường được filter (hiển thị với màu xanh da trời)
                 if (item[fieldName]) {
@@ -2696,7 +2702,7 @@
                             icon = '🔹 ';
                         }
                         
-                        badgesHTML += `<span class="clickable-badge dynamic-badge" data-field="${escapeHtml(fieldName)}" data-value="${escapeHtml(item[fieldName])}" style="background: ${color}; color: white; padding: 4px 10px; border-radius: 15px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.3s; display: inline-block; margin-right: 8px;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'" title="Click để lọc theo ${fieldName}: ${item[fieldName]}">${icon}${displayValue}</span>`;
+                        badgesHTML += `<span class="clickable-badge dynamic-badge" data-field="${escapeHtml(fieldName)}" data-value="${escapeHtml(item[fieldName])}" style="background: ${color}; color: white; padding: 4px 10px; border-radius: 15px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.3s; display: inline-block; margin-right: 4px;" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'" title="Click để lọc theo ${fieldName}: ${item[fieldName]}">${icon}${displayValue}</span>`;
                     }
                 });
             }
@@ -3071,7 +3077,7 @@
                             <div style="flex: 1;">
                                 <span class="suggestion-word">${highlightText(String(primaryText), searchTerm)}</span>
                                 <span class="suggestion-category">${maHP}</span>
-                                ${creditValue ? `<span class="clickable-badge credit-badge" data-field="${escapeHtml(detectedCreditFieldName)}" data-value="${escapeHtml(creditValue)}" style="background: #ff9800; color: white; padding: 2px 6px; border-radius: 10px; font-size: 10px; margin-left: 5px; cursor: pointer; transition: all 0.3s;" onmouseover="this.style.background='#f57f17'" onmouseout="this.style.background='#ff9800'" title="Click để lọc theo ${detectedCreditFieldName}: ${creditValue}">${creditValue} TC</span>` : ''}
+                                ${creditValue ? `<span class="clickable-badge credit-badge" data-field="${escapeHtml(detectedCreditFieldName)}" data-value="${escapeHtml(creditValue)}" style="background: #ff9800; color: white; padding: 2px 6px; border-radius: 10px; font-size: 10px; margin-left: 3px; cursor: pointer; transition: all 0.3s;" onmouseover="this.style.background='#f57f17'" onmouseout="this.style.background='#ff9800'" title="Click để lọc theo ${detectedCreditFieldName}: ${creditValue}">${creditValue} TC</span>` : ''}
                             </div>
                         </div>
                         <div class="suggestion-description">
@@ -3154,7 +3160,7 @@
                     resultHTML += `<div style="margin: 10px 0; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;">`;
                     
                     // Badges container (left side)
-                    resultHTML += `<div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">`;
+                    resultHTML += `<div style="display: flex; gap: 4px; align-items: center; flex-wrap: wrap;">`;
                     
                     // Dynamic badges based on user configuration
                     resultHTML += generateDynamicBadgesHTML(item);
@@ -3401,7 +3407,7 @@
                 resultHTML += `<div style="margin: 10px 0; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;">`;
                 
                 // Badges container (left side)
-                resultHTML += `<div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">`;
+                resultHTML += `<div style="display: flex; gap: 4px; align-items: center; flex-wrap: wrap;">`;
                 
                 // Dynamic badges based on user configuration
                 resultHTML += generateDynamicBadgesHTML(item);
