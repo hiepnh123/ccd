@@ -3870,7 +3870,8 @@
                 { name: 'HP khối ngành', icon: '📚', color: '#795548' },
                 { name: 'HP ngành', icon: '🎯', color: '#f57c00' },
                 { name: 'HP chuyên ngành', icon: '🔬', color: '#c2185b' },
-                { name: 'HP thực tập/tốt nghiệp', icon: '🎓', color: '#7b1fa2' }
+                { name: 'HP thực tập/tốt nghiệp', icon: '🎓', color: '#7b1fa2' },
+                { name: 'HP thay thế ĐA/Khóa luận TN', icon: '📋', color: '#ff6f00' }
             ];
             
             categories.forEach((category, index) => {
@@ -3894,8 +3895,17 @@
                 };
                 
                 option.onclick = function() {
-                    addToProgramWithCategory(item, category.name);
+                    // Immediate UI feedback - find and update button state right away
+                    const buttonElement = findButtonForItem(item);
+                    if (buttonElement) {
+                        updateButtonToAddedState(buttonElement);
+                    }
+                    
+                    // Close dropdown immediately
                     closeCategoryDropdown();
+                    
+                    // Process addition with optimized performance
+                    addToProgramWithCategoryOptimized(item, category.name);
                 };
                 
                 dropdown.appendChild(option);
@@ -3942,6 +3952,83 @@
             const fields = Object.keys(dataStructure);
             const primaryField = fields[0];
             showStatus(`Đã thêm "${item[primaryField]}" vào danh sách (${category})!`, 'success');
+        }
+        
+        // Optimized version with immediate feedback and deferred heavy operations
+        function addToProgramWithCategoryOptimized(item, category) {
+            // Add category and default requirement status to item
+            const itemWithCategory = { ...item, __category: category, isRequired: true };
+            
+            // Add to program immediately
+            selectedProgram.push(itemWithCategory);
+            
+            // Save to localStorage immediately
+            localStorage.setItem('selectedProgram', JSON.stringify(selectedProgram));
+            
+            // Update counter immediately (lightweight)
+            updateProgramCounter();
+            
+            // Show success feedback immediately
+            ensureFieldDetection();
+            const fields = Object.keys(dataStructure);
+            const primaryField = fields[0];
+            showStatus(`Đã thêm "${item[primaryField]}" vào danh sách (${category})!`, 'success');
+            
+            // Defer heavy operations to next tick to avoid blocking UI
+            setTimeout(() => {
+                updateProgramStats();
+                renderProgramList();
+                refreshCurrentViewOptimized(item);
+            }, 10);
+        }
+        
+        // Helper function to find button element for specific item
+        function findButtonForItem(item) {
+            ensureFieldDetection();
+            const fields = Object.keys(dataStructure);
+            const primaryField = fields[0];
+            const secondaryField = fields[1];
+            
+            // Find button by looking for onclick attribute containing item data
+            const buttons = document.querySelectorAll('.add-to-program-btn:not(.added)');
+            for (let button of buttons) {
+                const onclick = button.getAttribute('onclick');
+                if (onclick && onclick.includes(item[primaryField]) && 
+                    (!secondaryField || onclick.includes(item[secondaryField]))) {
+                    return button;
+                }
+            }
+            return null;
+        }
+        
+        // Helper function to immediately update button to "added" state
+        function updateButtonToAddedState(buttonElement) {
+            buttonElement.className = 'add-to-program-btn added';
+            buttonElement.disabled = true;
+            buttonElement.style.cssText = 'background: #4caf50; color: white; border: none; padding: 6px 16px; border-radius: 20px; font-size: 12px; cursor: default; opacity: 0.8; flex-shrink: 0;';
+            buttonElement.innerHTML = '✓ Đã thêm';
+            buttonElement.removeAttribute('onclick');
+            buttonElement.removeAttribute('onmouseover');
+            buttonElement.removeAttribute('onmouseout');
+        }
+        
+        // Optimized refresh that only updates necessary buttons instead of re-rendering everything
+        function refreshCurrentViewOptimized(addedItem) {
+            // Instead of refreshing entire view, just ensure other buttons with same item are updated
+            ensureFieldDetection();
+            const fields = Object.keys(dataStructure);
+            const primaryField = fields[0];
+            const secondaryField = fields[1];
+            
+            // Find any other instances of the same button and update them
+            const buttons = document.querySelectorAll('.add-to-program-btn:not(.added)');
+            buttons.forEach(button => {
+                const onclick = button.getAttribute('onclick');
+                if (onclick && onclick.includes(addedItem[primaryField]) && 
+                    (!secondaryField || onclick.includes(addedItem[secondaryField]))) {
+                    updateButtonToAddedState(button);
+                }
+            });
         }
 
         // Remove item from program
@@ -4221,7 +4308,8 @@
                 'HP khối ngành': { items: [], name: 'Học phần Khối ngành', icon: '📚' },
                 'HP ngành': { items: [], name: 'Học phần Ngành', icon: '🎯' },
                 'HP chuyên ngành': { items: [], name: 'Học phần Chuyên ngành', icon: '🔬' },
-                'HP thực tập/tốt nghiệp': { items: [], name: 'Học phần Thực tập/Tốt nghiệp', icon: '🎓' }
+                'HP thực tập/tốt nghiệp': { items: [], name: 'Học phần Thực tập/Tốt nghiệp', icon: '🎓' },
+                'HP thay thế ĐA/Khóa luận TN': { items: [], name: 'Học phần Thay thế ĐA/Khóa luận TN', icon: '📋' }
             };
             
             // Group items by their category
@@ -4460,7 +4548,8 @@
                 'HP khối ngành': { items: [], icon: '📚', color: '#795548', bgColor: '#efebe9', name: 'Học phần Khối ngành' },
                 'HP ngành': { items: [], icon: '🎯', color: '#f57c00', bgColor: '#fff3e0', name: 'Học phần Ngành' },
                 'HP chuyên ngành': { items: [], icon: '🔬', color: '#c2185b', bgColor: '#fce4ec', name: 'Học phần Chuyên ngành' },
-                'HP thực tập/tốt nghiệp': { items: [], icon: '🎓', color: '#7b1fa2', bgColor: '#f3e5f5', name: 'Học phần Thực tập/Tốt nghiệp' }
+                'HP thực tập/tốt nghiệp': { items: [], icon: '🎓', color: '#7b1fa2', bgColor: '#f3e5f5', name: 'Học phần Thực tập/Tốt nghiệp' },
+                'HP thay thế ĐA/Khóa luận TN': { items: [], icon: '📋', color: '#ff6f00', bgColor: '#fff8e1', name: 'Học phần Thay thế ĐA/Khóa luận TN' }
             };
             
             // Group items by their category
@@ -4699,7 +4788,8 @@
                 'HP khối ngành': { items: [], icon: '📚', color: '#795548', bgColor: '#efebe9' },
                 'HP ngành': { items: [], icon: '🎯', color: '#f57c00', bgColor: '#fff3e0' },
                 'HP chuyên ngành': { items: [], icon: '🔬', color: '#c2185b', bgColor: '#fce4ec' },
-                'HP thực tập/tốt nghiệp': { items: [], icon: '🎓', color: '#7b1fa2', bgColor: '#f3e5f5' }
+                'HP thực tập/tốt nghiệp': { items: [], icon: '🎓', color: '#7b1fa2', bgColor: '#f3e5f5' },
+                'HP thay thế ĐA/Khóa luận TN': { items: [], icon: '📋', color: '#ff6f00', bgColor: '#fff8e1' }
             };
             
             // Group items by their category
@@ -4735,7 +4825,7 @@
                     
                     // Table for this category - using dynamic column configuration
                     programHTML += `
-                        <div style="margin: 0 0 30px 20px; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        <div style="margin: 0 0 30px 20px; background: white; border-radius: 8px; overflow: visible; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                             <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
                                 <thead>
                                     <tr style="background: #f8f9fa; border-bottom: 2px solid #dee2e6;">
@@ -4779,6 +4869,7 @@
                             tenViet: tenViet,
                             tenAnh: tenAnh,
                             soTC: soTC,
+                            hocTruoc: createPrerequisiteSearchBox(maHP, item.__prerequisite || loadPrerequisiteForCourse(maHP)),
                             donVi: donVi,
                             batBuoc: `
                                 <div class="checkbox-container">
@@ -4828,6 +4919,9 @@
                                     break;
                                 case 'soTC':
                                     cellStyle += ' color: #495057; font-weight: 600;';
+                                    break;
+                                case 'hocTruoc':
+                                    cellStyle += ' padding: 5px;';
                                     break;
                                 case 'donVi':
                                     cellStyle += ' color: #6c757d; font-size: 12px;';
@@ -4883,6 +4977,7 @@
                 { id: 'tenViet', name: 'Tên tiếng Việt', visible: true, width: '200px', align: 'left' },
                 { id: 'tenAnh', name: 'Tên tiếng Anh', visible: true, width: '180px', align: 'left' },
                 { id: 'soTC', name: 'Số TC', visible: true, width: '70px', align: 'center' },
+                { id: 'hocTruoc', name: 'Mã HP học trước', visible: true, width: '140px', align: 'left' },
                 { id: 'donVi', name: 'Đơn vị quản lý', visible: true, width: '120px', align: 'left' },
                 { id: 'batBuoc', name: 'Bắt buộc/Tự chọn', visible: true, width: '130px', align: 'center' },
                 { id: 'xoa', name: 'Xóa', visible: true, width: '60px', align: 'center' }
@@ -4895,7 +4990,30 @@
             if (saved) {
                 try {
                     const parsed = JSON.parse(saved);
-                    columnConfig = { ...columnConfig, ...parsed };
+                    
+                    // Merge saved config with new default columns
+                    // Ensure new columns are added to existing config
+                    const defaultColumns = columnConfig.columns;
+                    const savedColumns = parsed.columns || [];
+                    
+                    // Create a map of saved columns by id
+                    const savedColumnsMap = {};
+                    savedColumns.forEach(col => {
+                        savedColumnsMap[col.id] = col;
+                    });
+                    
+                    // Merge: use saved visibility/settings but ensure all default columns exist
+                    const mergedColumns = defaultColumns.map(defaultCol => {
+                        if (savedColumnsMap[defaultCol.id]) {
+                            // Column exists in saved config - use saved settings
+                            return { ...defaultCol, ...savedColumnsMap[defaultCol.id] };
+                        } else {
+                            // New column not in saved config - use default
+                            return defaultCol;
+                        }
+                    });
+                    
+                    columnConfig.columns = mergedColumns;
                 } catch (e) {
                     console.log('Failed to load column config, using default');
                 }
@@ -4962,6 +5080,7 @@
                     { id: 'tenViet', name: 'Tên tiếng Việt', visible: true, width: '200px', align: 'left' },
                     { id: 'tenAnh', name: 'Tên tiếng Anh', visible: true, width: '180px', align: 'left' },
                     { id: 'soTC', name: 'Số TC', visible: true, width: '70px', align: 'center' },
+                    { id: 'hocTruoc', name: 'Mã HP học trước', visible: true, width: '140px', align: 'left' },
                     { id: 'donVi', name: 'Đơn vị quản lý', visible: true, width: '120px', align: 'left' },
                     { id: 'batBuoc', name: 'Bắt buộc/Tự chọn', visible: true, width: '130px', align: 'center' },
                     { id: 'xoa', name: 'Xóa', visible: true, width: '60px', align: 'center' }
@@ -4976,6 +5095,14 @@
             renderProgramList(); // Re-render the table with new configuration
             closeColumnConfigModal();
             showStatus('Đã áp dụng cấu hình cột mới!', 'success');
+        }
+        
+        // Debug function to check current column config (can be called from browser console)
+        function debugColumnConfig() {
+            console.log('Current column config:', columnConfig);
+            console.log('Saved in localStorage:', localStorage.getItem('columnConfig'));
+            console.log('Available columns:', columnConfig.columns.map(c => c.name));
+            return columnConfig;
         }
 
         // Drag and drop handlers
@@ -5026,11 +5153,309 @@
             }
         });
 
+        // Force update column config for new columns
+        function forceUpdateColumnConfig() {
+            // Clear old config to ensure new columns are loaded
+            localStorage.removeItem('columnConfig');
+            loadColumnConfig();
+            saveColumnConfig();
+            console.log('Column config updated with new columns:', columnConfig.columns.map(c => c.name));
+            
+            // Refresh UI if column config modal is open
+            const modal = document.getElementById('columnConfigModal');
+            if (modal && modal.style.display !== 'none') {
+                showColumnConfigModal();
+            }
+        }
+
         // Initialize when DOM is loaded
         document.addEventListener('DOMContentLoaded', function() {
             loadColumnConfig();
+            
+            // Check if we need to add new columns (for existing users)
+            const hasPrerequisiteColumn = columnConfig.columns.some(col => col.id === 'hocTruoc');
+            if (!hasPrerequisiteColumn) {
+                console.log('Adding new prerequisite column...');
+                forceUpdateColumnConfig();
+            }
+            
             initializeApp();
         });
+
+        // Prerequisite Course Management System
+        
+
+
+        
+        // Create search box for prerequisite courses
+        function createPrerequisiteSearchBox(courseCode, currentPrerequisite = '') {
+            const searchBoxId = `prerequisite_${courseCode.replace(/[^a-zA-Z0-9]/g, '_')}`;
+            const suggestionsId = `suggestions_${courseCode.replace(/[^a-zA-Z0-9]/g, '_')}`;
+            
+            return `
+                <div class="prerequisite-search-container" style="position: relative; width: 100%;">
+                    <input type="text" 
+                           id="${searchBoxId}"
+                           class="prerequisite-search-input"
+                           value="${currentPrerequisite}"
+                           placeholder="Nhập mã HP..."
+                           style="width: 100%; padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; box-sizing: border-box;"
+                           oninput="handlePrerequisiteSearch('${searchBoxId}', '${suggestionsId}', '${courseCode}')"
+                           onfocus="showPrerequisiteSuggestions('${searchBoxId}', '${suggestionsId}', '${courseCode}')"
+                           onblur="hidePrerequisiteSuggestions('${suggestionsId}')"
+                           onkeydown="handlePrerequisiteKeydown(event, '${suggestionsId}', '${courseCode}')">
+                    <div id="${suggestionsId}" 
+                         class="prerequisite-suggestions"
+                         style="position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ddd; border-top: none; max-height: 200px; overflow-y: auto; z-index: 9999; display: none; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border-radius: 0 0 4px 4px;">
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Handle prerequisite search input
+        function handlePrerequisiteSearch(inputId, suggestionsId, targetCourseCode) {
+            const input = document.getElementById(inputId);
+            const suggestionsDiv = document.getElementById(suggestionsId);
+            const query = input.value.toLowerCase().trim();
+            
+            if (query === '') {
+                suggestionsDiv.style.display = 'none';
+                return;
+            }
+            
+            // Search through all available courses using existing fuzzy logic
+            const matches = [];
+            if (dictionaryData && dictionaryData.length > 0) {
+                ensureFieldDetection();
+                
+                const searchLower = query.toLowerCase();
+                const searchFuzzy = removeDiacritics(searchLower);
+                
+                dictionaryData.forEach(course => {
+                    const courseCode = course[Object.keys(course).find(key => 
+                        key.toLowerCase().includes('mã') && key.toLowerCase().includes('hp')
+                    )] || '';
+                    const courseName = course[Object.keys(course).find(key => 
+                        key.toLowerCase().includes('tên') && key.toLowerCase().includes('việt')
+                    )] || '';
+                    
+                    // Skip if this is the same course (can't be prerequisite of itself)
+                    if (courseCode === targetCourseCode) return;
+                    
+                    // Use same fuzzy search logic as main search
+                    const codeText = courseCode.toLowerCase();
+                    const nameText = courseName.toLowerCase();
+                    const codeFuzzy = removeDiacritics(codeText);
+                    const nameFuzzy = removeDiacritics(nameText);
+                    
+                    const codeMatch = codeText.includes(searchLower) || codeFuzzy.includes(searchFuzzy);
+                    const nameMatch = nameText.includes(searchLower) || nameFuzzy.includes(searchFuzzy);
+                    
+                    if (codeMatch || nameMatch) {
+                        // Simple scoring for relevance
+                        let score = 0;
+                        if (codeText === searchLower) score += 100;
+                        else if (codeText.startsWith(searchLower)) score += 50;
+                        else if (codeMatch) score += 25;
+                        if (nameMatch) score += 10;
+                        
+                        matches.push({ 
+                            code: courseCode, 
+                            name: courseName, 
+                            score: score 
+                        });
+                    }
+                });
+                
+                // Sort by score (highest first)
+                matches.sort((a, b) => b.score - a.score);
+            }
+            
+            // Limit to top 10 matches
+            const limitedMatches = matches.slice(0, 10);
+            
+            if (limitedMatches.length > 0) {
+                let suggestionsHTML = '';
+                limitedMatches.forEach(match => {
+                    suggestionsHTML += `
+                        <div class="suggestion-item" 
+                             style="padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #f0f0f0; font-size: 12px;"
+                             onmousedown="selectPrerequisite('${inputId}', '${suggestionsId}', '${match.code}', '${targetCourseCode}')"
+                             onmouseover="this.style.backgroundColor='#f8f9fa'"
+                             onmouseout="this.style.backgroundColor='white'">
+                            <div style="font-weight: 600; color: #495057;">${match.code}</div>
+                            <div style="color: #6c757d; margin-top: 2px;">${match.name}</div>
+                        </div>
+                    `;
+                });
+                suggestionsDiv.innerHTML = suggestionsHTML;
+                suggestionsDiv.style.display = 'block';
+            } else {
+                suggestionsDiv.innerHTML = '<div style="padding: 12px; color: #6c757d; font-size: 12px; text-align: center;">Không tìm thấy học phần</div>';
+                suggestionsDiv.style.display = 'block';
+            }
+        }
+        
+
+        
+        // Show prerequisite suggestions
+        function showPrerequisiteSuggestions(inputId, suggestionsId, targetCourseCode) {
+            const input = document.getElementById(inputId);
+            if (input.value.trim() !== '') {
+                handlePrerequisiteSearch(inputId, suggestionsId, targetCourseCode);
+            }
+        }
+        
+        // Hide prerequisite suggestions
+        function hidePrerequisiteSuggestions(suggestionsId) {
+            setTimeout(() => {
+                const suggestionsDiv = document.getElementById(suggestionsId);
+                if (suggestionsDiv) {
+                    suggestionsDiv.style.display = 'none';
+                }
+            }, 200);
+        }
+        
+
+        
+        // Hide all prerequisite suggestions when clicking outside
+        document.addEventListener('click', function(event) {
+            // Check if click is inside any prerequisite search container
+            const clickedInsideSearch = event.target.closest('.prerequisite-search-container');
+            
+            if (!clickedInsideSearch) {
+                // Click outside all search containers - hide all dropdowns
+                const allDropdowns = document.querySelectorAll('.prerequisite-suggestions');
+                allDropdowns.forEach(dropdown => {
+                    dropdown.style.display = 'none';
+                });
+            }
+        });
+        
+        // Handle keyboard navigation in suggestions
+        function handlePrerequisiteKeydown(event, suggestionsId, targetCourseCode) {
+            const suggestionsDiv = document.getElementById(suggestionsId);
+            const suggestions = suggestionsDiv.querySelectorAll('.suggestion-item');
+            
+            if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                // Navigate down through suggestions
+                let activeIndex = -1;
+                suggestions.forEach((item, index) => {
+                    if (item.style.backgroundColor === 'rgb(248, 249, 250)') {
+                        activeIndex = index;
+                        item.style.backgroundColor = 'white';
+                    }
+                });
+                const nextIndex = Math.min(activeIndex + 1, suggestions.length - 1);
+                if (suggestions[nextIndex]) {
+                    suggestions[nextIndex].style.backgroundColor = '#f8f9fa';
+                }
+            } else if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                // Navigate up through suggestions
+                let activeIndex = -1;
+                suggestions.forEach((item, index) => {
+                    if (item.style.backgroundColor === 'rgb(248, 249, 250)') {
+                        activeIndex = index;
+                        item.style.backgroundColor = 'white';
+                    }
+                });
+                const prevIndex = Math.max(activeIndex - 1, 0);
+                if (suggestions[prevIndex]) {
+                    suggestions[prevIndex].style.backgroundColor = '#f8f9fa';
+                }
+            } else if (event.key === 'Enter') {
+                event.preventDefault();
+                // Select highlighted suggestion
+                const activeSuggestion = suggestionsDiv.querySelector('.suggestion-item[style*="rgb(248, 249, 250)"]');
+                if (activeSuggestion) {
+                    const courseCode = activeSuggestion.querySelector('div').textContent;
+                    const inputId = event.target.id;
+                    selectPrerequisite(inputId, suggestionsId, courseCode, targetCourseCode);
+                }
+            } else if (event.key === 'Escape') {
+                suggestionsDiv.style.display = 'none';
+            }
+        }
+        
+        // Select a prerequisite course
+        function selectPrerequisite(inputId, suggestionsId, prerequisiteCode, targetCourseCode) {
+            const input = document.getElementById(inputId);
+            const suggestionsDiv = document.getElementById(suggestionsId);
+            
+            input.value = prerequisiteCode;
+            suggestionsDiv.style.display = 'none';
+            
+            // Save prerequisite data
+            savePrerequisiteData(targetCourseCode, prerequisiteCode);
+            
+            // Update the course item in selectedProgram
+            updateCoursePrerequisite(targetCourseCode, prerequisiteCode);
+            
+            // Show success feedback
+            showStatus(`Đã cập nhật học phần điều kiện: ${prerequisiteCode} cho ${targetCourseCode}`, 'success');
+            
+            // Focus back to input for better UX
+            setTimeout(() => input.focus(), 10);
+        }
+        
+        // Save prerequisite data to localStorage
+        function savePrerequisiteData(courseCode, prerequisiteCode) {
+            let prerequisiteData = {};
+            const saved = localStorage.getItem('prerequisiteData');
+            if (saved) {
+                try {
+                    prerequisiteData = JSON.parse(saved);
+                } catch (e) {
+                    prerequisiteData = {};
+                }
+            }
+            
+            prerequisiteData[courseCode] = prerequisiteCode;
+            localStorage.setItem('prerequisiteData', JSON.stringify(prerequisiteData));
+        }
+        
+        // Load prerequisite data from localStorage
+        function loadPrerequisiteData() {
+            const saved = localStorage.getItem('prerequisiteData');
+            if (saved) {
+                try {
+                    return JSON.parse(saved);
+                } catch (e) {
+                    return {};
+                }
+            }
+            return {};
+        }
+        
+
+        
+        // Load prerequisite for a specific course
+        function loadPrerequisiteForCourse(courseCode) {
+            const prerequisiteData = loadPrerequisiteData();
+            return prerequisiteData[courseCode] || '';
+        }
+        
+        // Update course prerequisite in selectedProgram
+        function updateCoursePrerequisite(courseCode, prerequisiteCode) {
+            ensureFieldDetection();
+            const fields = Object.keys(dataStructure);
+            const maHPField = fields.find(field => 
+                field.toLowerCase().includes('mã') && field.toLowerCase().includes('hp')
+            );
+            
+            if (maHPField) {
+                selectedProgram.forEach(item => {
+                    if (item[maHPField] === courseCode) {
+                        item.__prerequisite = prerequisiteCode;
+                    }
+                });
+                
+                // Save updated program
+                localStorage.setItem('selectedProgram', JSON.stringify(selectedProgram));
+            }
+        }
 
     </script>
 
