@@ -3653,9 +3653,9 @@
             document.getElementById('sheetSelector').style.display = 'none';
 
             if (isMultipleSheets) {
-                showStatus(`Đã gộp ${selectedSheetNames.length} sheet: ${totalValidRows} dòng hợp lệ, ${totalInvalidRows} dòng bỏ qua (thiếu dữ liệu)`, 'success');
+                showStatus(`Đã gộp ${selectedSheetNames.length} sheet: ${totalValidRows} dòng dữ liệu, ${totalInvalidRows} dòng trống bỏ qua`, 'success');
             } else {
-                showStatus(`Đã xử lý: ${totalValidRows} dòng hợp lệ, ${totalInvalidRows} dòng bỏ qua (thiếu dữ liệu)`, 'success');
+                showStatus(`Đã xử lý: ${totalValidRows} dòng dữ liệu, ${totalInvalidRows} dòng trống bỏ qua`, 'success');
             }
             displayPreview();
         }
@@ -3674,7 +3674,7 @@
             let invalidRows = 0;
 
             dataRows.forEach((row, index) => {
-                // Skip empty rows
+                // Skip completely empty rows only
                 if (!row || row.length === 0 || row.every(cell => !cell)) {
                     invalidRows++;
                     return;
@@ -3692,7 +3692,6 @@
                     rowData[customFieldName] = sheetName;
                 }
 
-                let hasCompleteData = true; // Changed: require ALL fields to have data
                 let fieldCount = 0;
                 
                 headerRow.forEach((header, colIndex) => {
@@ -3706,19 +3705,14 @@
                             fieldName.toLowerCase().includes('keyword') ||
                             fieldName.toLowerCase().includes('từ khóa')) {
                             rowData[fieldName] = cellValue ? cellValue.split(',').map(tag => tag.trim()) : [];
-                            // For array fields, empty is acceptable
                         } else {
                             rowData[fieldName] = cellValue;
-                            // For regular fields, require non-empty value
-                            if (!cellValue || cellValue === '') {
-                                hasCompleteData = false;
-                            }
                         }
                     }
                 });
 
-                // Only add rows that have complete data in ALL fields (except array fields)
-                if (hasCompleteData && fieldCount > 0) {
+                // Accept all rows that have at least one field (no validation for complete data)
+                if (fieldCount > 0) {
                     sheetData.push(rowData);
                     validRows++;
                 } else {
